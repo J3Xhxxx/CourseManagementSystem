@@ -38,6 +38,7 @@ if(COURSE_PLANNER_WITH_QT)
     add_executable(course_data src/demo/data_main.cpp)
     target_link_libraries(course_data PRIVATE course_io)
     add_library(course_ui
+        src/ui/LoginDialog.cpp src/ui/LoginDialog.h
         src/ui/ProjectController.cpp src/ui/ProjectController.h
         src/ui/MainWindow.cpp src/ui/MainWindow.h
         src/ui/TeachingClassPanel.cpp src/ui/TeachingClassPanel.h

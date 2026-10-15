@@ -2,6 +2,7 @@
 #include "ui/ProjectController.h"
 #include "ui/SearchController.h"
 #include <QMainWindow>
+#include <QList>
 #include <functional>
 class QAction;
 class QLabel;
@@ -16,8 +17,9 @@ class CandidatePanel;
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
-    explicit MainWindow(QWidget* parent = nullptr);
+    MainWindow(const QString& accountName, const QString& accountsDirectory, QWidget* parent = nullptr);
     ProjectController& controller() noexcept { return controller_; }
+    bool switchingAccount() const noexcept { return switchingAccount_; }
 protected:
     void closeEvent(QCloseEvent* event) override;
 private:
@@ -26,7 +28,7 @@ private:
     void showCandidate(int index);
     void newProject();
     void openProject();
-    bool saveProject(bool saveAs = false);
+    bool saveProject();
     bool maybeSave();
     void importCsv();
     void editTeachingClass(bool create);
@@ -42,7 +44,10 @@ private:
     CandidatePanel* candidates_;
     QTabWidget* tabs_;
     bool viewingCandidate_ = false;
+    bool switchingAccount_ = false;
     QLabel* totals_;
+    QList<QAction*> writeActions_;
+    QAction* own_;
     QAction* edit_;
     QAction* remove_;
 };
