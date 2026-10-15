@@ -1,6 +1,6 @@
 # 核心算法代码解释
 
-本文解释排课搜索相关的 7 个文件：
+本文解释时间位图、冲突图、搜索、评价与 Top-K 的主要源码：
 
 | 文件 | 作用 |
 | --- | --- |
@@ -8,6 +8,8 @@
 | `src/core/algorithms/ConflictDetector.cpp` | 判断两个教学班能否同时选，并给出原因 |
 | `src/core/structures/ConflictGraph.cpp` | 把所有教学班两两之间的冲突建成一张无向图，供界面查看 |
 | `src/core/algorithms/ScheduleGenerator.h/.cpp` | 选课方案搜索：回溯、MRV、MRV + 前向检查三种策略 |
+| `src/core/algorithms/ScheduleEvaluator.h/.cpp` | 按真实周次计算六项指标，并按偏好优先级比较方案 |
+| `src/core/structures/BoundedMaxHeap.h` | 用固定容量大根堆保留较优的 K 个方案 |
 | `src/demo/benchmark_main.cpp` | 用 4 组固定数据比较暴力枚举和三种策略的正确性与效率 |
 
 它们的依赖关系是：
@@ -205,11 +207,11 @@ for (size_t i = 0; i < n; ++i)
 | 值 | 含义 |
 | --- | --- |
 | `Complete` | 整棵搜索树都搜完了，结果是全部合法方案 |
-| `SolutionLimit` | 方案数达到上限，后面还有方案没保存 |
+| `SolutionLimit` | 全部搜完，合法方案多于 K，只保留较优的 K 个 |
 | `NodeLimit` | 尝试次数达到上限，搜索没完成 |
 | `Cancelled` | 用户取消 |
 
-只有 `Complete` 时“0 个方案”才能说明真的无解；其他情况下 0 个方案只表示“还没找到”。
+`complete()` 对 `Complete` 与 `SolutionLimit` 都返回 true。节点上限或用户取消时，结果只是已探索部分中的较优方案，0 个方案不代表无解。
 
 ### 4.4 SearchStatistics：统计数据
 
@@ -288,7 +290,7 @@ dfs(0)
 
 ```cpp
 bool Searcher::dfs(size_t depth) {
-    if (depth == domains_.size()) { return saveSchedule(); }  // 每门课都选好了
+    if (depth == domains_.size()) { saveSchedule(); return true; }  // 每门课都选好了
     vector<size_t> values;
     size_t course = chooseCourse(values);                     // 决定这层选哪门课
     if (values.empty()) { ++prunedBranches; return true; }    // 这门课无班可选
@@ -314,7 +316,7 @@ bool Searcher::dfs(size_t depth) {
 要点：
 
 - **depth** 表示已经选好的课程数。等于课程总数时说明得到一个完整方案。
-- **返回值** 表示要不要继续搜索。用户取消、尝试次数到上限、方案数到上限时返回 false，这个 false 会一层层往上传，整个搜索就停下来。
+- **返回值** 表示要不要继续搜索。用户取消或尝试次数到上限时返回 false，这个 false 会一层层往上传，整个搜索就停下来。保留方案达到 K 个后仍继续搜索。
 - **剪枝 1**：候选班与已占用时间冲突，这个分支不可能合法，直接跳过。
 - **回溯**：递归返回后，要把本层做的修改全部撤销，才能尝试下一个候选。
 
@@ -382,15 +384,12 @@ void Searcher::restore(size_t mark) {
 
 ```cpp
 ++completeLeaves;
-if (schedules.size() == maxSolutions) {
-    status = SolutionLimit;
-    return false;
-}
-保存方案
-return true;
+++totalSolutions;
+构造方案并计算六项评价指标
+heap.offer(方案);
 ```
 
-注意判断上限是在**保存之前**：已经存满 K 个，又找到第 K+1 个时，才标记 `SolutionLimit` 并停止。如果恰好只有 K 个方案，搜索会正常搜完并报告 `Complete`，用户就能知道“方案就这么多”，而不是误以为还有更多。也正因为如此，`completeLeaves` 可能比保存的方案数多 1。
+堆顶是当前保留方案中最差的一个。堆未满直接插入；堆满后，新方案只有比堆顶更好才替换。搜索结束后将堆按从优到差取出，最多保存 K 个；`totalSolutions` 和 `completeLeaves` 记录已发现的完整合法方案总数。只有完整搜完后，结果才是全局 Top-K。
 
 方案里的教学班顺序：先是固定课程（来自 `initial_`），再按课程顺序排列 `selected_`，与 MRV 实际的选择顺序无关，方便界面展示。
 
@@ -453,6 +452,8 @@ A=2 → B=1 → C=1 冲突剪枝；B=2 冲突剪枝 → 回溯
 3. 每种策略输出一行 CSV：方案数、尝试次数、完整组合数、剪枝次数、用时、是否与暴力枚举一致。
 
 ### 6.4 实际结果（Release，本机）
+
+以下为接入 Top-K 前的历史输出。当前 CSV 增加 `kept` 列；`solutions` 表示合法方案总数，`kept` 表示实际保留数。
 
 ```
 case,strategy,solutions,visited_nodes,complete_combinations,pruned_branches,elapsed_ms,same_as_brute

@@ -7,7 +7,7 @@ using namespace std;
 
 enum class ValidationCode {
     DuplicateCourse, MissingCourse, UnexpectedCourse, MissingLockedTeachingClass,
-    MissingFixedTeachingClass, ForbiddenTime, TimeOverlap
+    MissingFixedTeachingClass, ForbiddenTime, TimeOverlap, MetricsMismatch
 };
 struct ValidationIssue {
     ValidationCode code;

@@ -7,7 +7,9 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSignalBlocker>
 #include <QTableWidget>
 #include <QVBoxLayout>
@@ -18,7 +20,16 @@ using namespace std;
 namespace planner::ui {
 ConstraintPanel::ConstraintPanel(ProjectController& project, QWidget* parent)
     : QWidget(parent), project_(project) {
-    auto* layout = new QVBoxLayout(this);
+    // 约束和偏好放在同一个可滚动区域，小窗口下也能访问全部设置。
+    auto* outer = new QVBoxLayout(this);
+    outer->setContentsMargins(0,0,0,0);
+    auto* scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    auto* content = new QWidget(scroll);
+    scroll->setWidget(content);
+    outer->addWidget(scroll);
+    auto* layout = new QVBoxLayout(content);
     auto* hint = new QLabel("学校固定课程始终保留，无法取消或换班。\n其他课程每门选一个班；锁定会自动勾选课程。",this);
     hint->setWordWrap(true);
     layout->addWidget(hint);
@@ -86,6 +97,23 @@ ConstraintPanel::ConstraintPanel(ProjectController& project, QWidget* parent)
     error_->setWordWrap(true);
     error_->setStyleSheet("color: #a12622;");
     forbiddenLayout->addWidget(error_);
+    auto* preferenceBox = new QGroupBox("方案偏好优先级",this);
+    auto* preferenceLayout = new QVBoxLayout(preferenceBox);
+    layout->addWidget(preferenceBox);
+    auto* preferenceHint = new QLabel("从上到下依次比较，前一项相同时再比较下一项。\n空闲半天统计上午（1-2 节）与下午（3-4 节）。",preferenceBox);
+    preferenceHint->setWordWrap(true);
+    preferenceLayout->addWidget(preferenceHint);
+    preference_ = new QListWidget(preferenceBox);
+    preference_->setMaximumHeight(150);
+    preferenceLayout->addWidget(preference_);
+    auto* preferenceButtons = new QHBoxLayout;
+    preferenceUp_ = new QPushButton("上移",preferenceBox);
+    preferenceDown_ = new QPushButton("下移",preferenceBox);
+    preferenceReset_ = new QPushButton("恢复默认顺序",preferenceBox);
+    preferenceButtons->addWidget(preferenceUp_);
+    preferenceButtons->addWidget(preferenceDown_);
+    preferenceButtons->addWidget(preferenceReset_);
+    preferenceLayout->addLayout(preferenceButtons);
     connect(courses_, &QTableWidget::itemChanged, this, [this](QTableWidgetItem* item) {
         if (item->column() == 0) { setRequired(item->data(Qt::UserRole).toString().toStdString(),item->checkState() == Qt::Checked); }
     });
@@ -105,6 +133,10 @@ ConstraintPanel::ConstraintPanel(ProjectController& project, QWidget* parent)
         start_->setValue(group.front().period);
         end_->setValue(group.front().period);
     });
+    connect(preference_, &QListWidget::itemSelectionChanged, this, &ConstraintPanel::updatePreferenceButtons);
+    connect(preferenceUp_, &QPushButton::clicked, this, [this] { movePreference(-1); });
+    connect(preferenceDown_, &QPushButton::clicked, this, [this] { movePreference(1); });
+    connect(preferenceReset_, &QPushButton::clicked, this, &ConstraintPanel::resetPreference);
     // 先停用旧控件，再排队重建；直接刷新会在信号处理中删除正在使用的下拉框。
     connect(&project_, &ProjectController::dataChanged, this, [this] { error_->clear(); setEnabled(false); });
     connect(&project_, &ProjectController::dataChanged, this, &ConstraintPanel::refresh,Qt::QueuedConnection);
@@ -158,6 +190,19 @@ void ConstraintPanel::refresh() {
     summary_->setText(QString("固定 %1 门 · 必选 %2 门 · 个人锁定 %3 个班 · 禁止 %4 个全学期时段")
         .arg(fixedCount).arg(constraints.requiredCourseKeys.size())
         .arg(constraints.lockedTeachingClassIds.size()).arg(constraints.forbiddenTimes.count()));
+    const int selected = preference_->currentItem() ? preference_->currentItem()->data(Qt::UserRole).toInt() : -1;
+    {
+        QSignalBlocker blocker(preference_);
+        preference_->clear();
+        for (const auto id : constraints.preferenceOrder.values) {
+            const auto direction = ascendingMetric(id) ? "（越少越好）" : "（越多越好）";
+            auto* item = new QListWidgetItem(QString::fromUtf8(metricLabel(id)) + direction,preference_);
+            item->setData(Qt::UserRole,static_cast<int>(id));
+            if (static_cast<int>(id) == selected) { preference_->setCurrentItem(item); }
+        }
+        if (!preference_->currentItem()) { preference_->setCurrentRow(0); }
+    }
+    updatePreferenceButtons();
     map<pair<int,int>,vector<TimeSlot>> grouped;
     for (const auto& time : constraints.forbiddenTimes.occupiedSlots()) { grouped[{time.weekday,time.period}].push_back(time); }
     forbidden_->setRowCount(0);
@@ -229,5 +274,26 @@ void ConstraintPanel::removeSelectedForbidden() {
     for (const auto& time : groups_[static_cast<size_t>(row)]) { removed.set(time); }
     constraints.forbiddenTimes.subtract(removed);
     apply(std::move(constraints));
+}
+void ConstraintPanel::movePreference(int offset) {
+    const int row = preference_->currentRow();
+    const int target = row + offset;
+    if (row < 0 || target < 0 || target >= preference_->count()) { return; }
+    auto constraints = project_.project().constraints();
+    swap(constraints.preferenceOrder.values[static_cast<size_t>(row)],
+        constraints.preferenceOrder.values[static_cast<size_t>(target)]);
+    apply(std::move(constraints));
+}
+void ConstraintPanel::resetPreference() {
+    auto constraints = project_.project().constraints();
+    constraints.preferenceOrder = PreferenceOrder::defaultOrder();
+    apply(std::move(constraints));
+}
+void ConstraintPanel::updatePreferenceButtons() {
+    const int row = preference_->currentRow();
+    const bool writable = !project_.readOnly();
+    preferenceUp_->setEnabled(writable && row > 0);
+    preferenceDown_->setEnabled(writable && row >= 0 && row + 1 < preference_->count());
+    preferenceReset_->setEnabled(writable && !(project_.project().constraints().preferenceOrder == PreferenceOrder::defaultOrder()));
 }
 }

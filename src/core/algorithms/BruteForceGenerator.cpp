@@ -1,4 +1,5 @@
 #include "core/algorithms/BruteForceGenerator.h"
+#include "core/algorithms/ScheduleEvaluator.h"
 #include "core/algorithms/ScheduleValidator.h"
 #include <stdexcept>
 
@@ -28,7 +29,11 @@ vector<Schedule> BruteForceGenerator::generate(const TeachingClassService& proje
             candidate.selectedTeachingClassIds.push_back(id);
             candidate.occupiedTimeBitmap.unite(project.findTeachingClass(id)->timeBitmap());
         }
-        if (ScheduleValidator::validate(project, candidate).valid()) { result.push_back(move(candidate)); }
+        // 先评价再校验：校验器会复核方案保存的六项指标，指标为空的方案视为过期结果。
+        candidate.evaluation = ScheduleEvaluator::evaluate(project, candidate);
+        if (ScheduleValidator::validate(project, candidate).valid()) {
+            result.push_back(move(candidate));
+        }
     }
     return result;
 }

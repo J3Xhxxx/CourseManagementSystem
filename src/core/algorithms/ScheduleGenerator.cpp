@@ -1,4 +1,6 @@
 #include "core/algorithms/ScheduleGenerator.h"
+#include "core/algorithms/ScheduleEvaluator.h"
+#include "core/structures/BoundedMaxHeap.h"
 #include <chrono>
 #include <cstdint>
 #include <unordered_map>
@@ -13,7 +15,8 @@ class Searcher {
 public:
     Searcher(const TeachingClassService& project, const SearchOptions& options)
         : project_(project), options_(options), initial_(project.fixedSchedule()),
-          occupied_(initial_.occupiedTimeBitmap) {}
+          occupied_(initial_.occupiedTimeBitmap),
+          heap_(options.maxSolutions, ScheduleAbove::from(project.constraints().preferenceOrder)) {}
     SearchResult run();
 
 private:
@@ -21,7 +24,7 @@ private:
     size_t chooseCourse(vector<size_t>& values);
     bool forwardCheck(const TeachingClass* chosen);
     void restore(size_t mark);
-    bool saveSchedule();
+    void saveSchedule();
     bool dfs(size_t depth);
 
     const TeachingClassService& project_;
@@ -39,6 +42,7 @@ private:
     vector<size_t> remaining_; // 每门课还剩多少个有效候选
     vector<pair<size_t, size_t>> removed_; // 删除记录 (课程, 候选)，回溯时按栈的顺序恢复
     unordered_map<string, pair<size_t, size_t>> candidatePositions_; // 教学班 ID -> (课程, 候选)
+    BoundedMaxHeap<Schedule, ScheduleAbove> heap_; // 堆顶为保留方案中最差的一个。
 };
 
 // 第一步：为每门要搜索的课程准备候选教学班，并检查不能替换的班之间有没有直接冲突。
@@ -171,28 +175,24 @@ void Searcher::restore(size_t mark) {
     }
 }
 
-// 保存当前选课方案。返回 false 表示方案数已满，需要停止搜索。
-bool Searcher::saveSchedule() {
+// 每个合法方案先评价，再由大根堆保留较优的 K 个；堆满后仍继续搜索。
+void Searcher::saveSchedule() {
     ++result_.statistics.completeLeaves;
-    // 找到第 K+1 个方案才标记截断，这样恰好有 K 个方案时仍能报告“全部搜完”。
-    if (result_.schedules.size() == options_.maxSolutions) {
-        result_.status = SearchStatus::SolutionLimit;
-        return false;
-    }
+    ++result_.totalSolutions;
     Schedule schedule = initial_;
     // 按课程分组顺序排列，不跟随 MRV 的实际选课顺序。
     for (const TeachingClass* teachingClass : selected_) {
         schedule.selectedTeachingClassIds.push_back(teachingClass->id());
     }
     schedule.occupiedTimeBitmap = occupied_;
-    result_.schedules.push_back(schedule);
-    return true;
+    schedule.evaluation = ScheduleEvaluator::evaluate(project_, schedule);
+    heap_.offer(move(schedule));
 }
 
 // 深度优先搜索，depth 是已经选好的课程数。
-// 返回 false 表示需要停止整个搜索（用户取消、达到尝试上限或方案数上限）。
+// 返回 false 表示需要停止整个搜索（用户取消或达到尝试上限）。
 bool Searcher::dfs(size_t depth) {
-    if (depth == domains_.size()) { return saveSchedule(); }
+    if (depth == domains_.size()) { saveSchedule(); return true; }
     vector<size_t> values;
     size_t course = chooseCourse(values);
     if (values.empty()) {
@@ -245,6 +245,11 @@ SearchResult Searcher::run() {
             remaining_.push_back(domain.size());
         }
         dfs(0);
+    }
+    result_.schedules = heap_.drainSorted();
+    // 只有完整搜索后，Top-K 才是整个候选空间中的最优结果。
+    if (result_.status == SearchStatus::Complete && result_.totalSolutions > options_.maxSolutions) {
+        result_.status = SearchStatus::SolutionLimit;
     }
     auto end = chrono::steady_clock::now();
     result_.statistics.elapsedMilliseconds = chrono::duration<double, milli>(end - start).count();

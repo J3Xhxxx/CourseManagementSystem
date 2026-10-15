@@ -15,9 +15,11 @@ add_library(course_core
     src/core/structures/TimeBitSet.cpp
     src/core/model/Meeting.cpp
     src/core/model/TeachingClass.cpp
+    src/core/model/Schedule.cpp
     src/core/model/UserConstraints.cpp
     src/core/algorithms/ConflictDetector.cpp
     src/core/algorithms/ScheduleGenerator.cpp
+    src/core/algorithms/ScheduleEvaluator.cpp
     src/core/algorithms/ScheduleValidator.cpp
     src/core/algorithms/BruteForceGenerator.cpp
     src/core/structures/ConflictGraph.cpp

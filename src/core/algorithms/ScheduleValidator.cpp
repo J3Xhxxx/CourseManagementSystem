@@ -1,4 +1,5 @@
 #include "core/algorithms/ScheduleValidator.h"
+#include "core/algorithms/ScheduleEvaluator.h"
 #include <map>
 #include <set>
 #include <tuple>
@@ -55,6 +56,15 @@ ValidationResult ScheduleValidator::validate(const TeachingClassService& project
     for (auto& entry : overlaps) {
         result.issues.push_back({ValidationCode::TimeOverlap, entry.first.first,
             entry.first.second, move(entry.second)});
+    }
+    // 用评价器独立重算一遍指标，确认方案保存的评价结果没有过期或被写错。
+    const ScheduleMetrics metrics = ScheduleEvaluator::evaluate(project, schedule);
+    const ScheduleMetrics& stored = schedule.evaluation;
+    if (metrics.earlyMorningCount != stored.earlyMorningCount || metrics.classDays != stored.classDays
+        || metrics.totalGapPeriods != stored.totalGapPeriods
+        || metrics.maximumContinuousPeriods != stored.maximumContinuousPeriods
+        || metrics.latestEndPeriod != stored.latestEndPeriod || metrics.freeHalfDays != stored.freeHalfDays) {
+        result.issues.push_back({ValidationCode::MetricsMismatch, {}, {}, {}});
     }
     return result;
 }
