@@ -3,5 +3,6 @@
 /.idea/
 /.vs/
 /tmp/
+/accounts/
 *.user
 __pycache__/

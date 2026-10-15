@@ -1,9 +1,11 @@
 #pragma once
 #include "ui/ProjectController.h"
 #include <QWidget>
+#include <QList>
 class QComboBox;
 class QLabel;
 class QLineEdit;
+class QPushButton;
 class QSpinBox;
 class QTableWidget;
 namespace planner::ui {
@@ -30,6 +32,8 @@ private:
     QSpinBox* end_;
     QLabel* summary_;
     QLabel* error_;
+    QList<QWidget*> inputs_;
+    QPushButton* remove_;
     vector<vector<TimeSlot>> groups_;
     int semesterWeeks_ = 0;
 };

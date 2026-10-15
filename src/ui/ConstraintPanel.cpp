@@ -77,9 +77,10 @@ ConstraintPanel::ConstraintPanel(ProjectController& project, QWidget* parent)
     forbidden_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     forbidden_->setMinimumHeight(100);
     forbiddenLayout->addWidget(forbidden_,1);
-    auto* remove = new QPushButton("删除选中的禁止时间",forbiddenBox);
-    remove->setEnabled(false);
-    forbiddenLayout->addWidget(remove);
+    remove_ = new QPushButton("删除选中的禁止时间",forbiddenBox);
+    remove_->setEnabled(false);
+    forbiddenLayout->addWidget(remove_);
+    inputs_ = {weeks_, pattern_, weekday_, start_, end_, add, clearRange};
     error_ = new QLabel(forbiddenBox);
     error_->setTextFormat(Qt::PlainText);
     error_->setWordWrap(true);
@@ -90,9 +91,9 @@ ConstraintPanel::ConstraintPanel(ProjectController& project, QWidget* parent)
     });
     connect(add, &QPushButton::clicked, this, [this] { editForbidden(true); });
     connect(clearRange, &QPushButton::clicked, this, [this] { editForbidden(false); });
-    connect(remove, &QPushButton::clicked, this, &ConstraintPanel::removeSelectedForbidden);
-    connect(forbidden_, &QTableWidget::itemSelectionChanged, this, [this,remove] {
-        remove->setEnabled(forbidden_->currentRow() >= 0);
+    connect(remove_, &QPushButton::clicked, this, &ConstraintPanel::removeSelectedForbidden);
+    connect(forbidden_, &QTableWidget::itemSelectionChanged, this, [this] {
+        remove_->setEnabled(!project_.readOnly() && forbidden_->currentRow() >= 0);
     });
     connect(forbidden_, &QTableWidget::cellDoubleClicked, this, [this](int row,int) {
         const auto& group = groups_[static_cast<size_t>(row)];
@@ -105,7 +106,7 @@ ConstraintPanel::ConstraintPanel(ProjectController& project, QWidget* parent)
         end_->setValue(group.front().period);
     });
     // 先停用旧控件，再排队重建；直接刷新会在信号处理中删除正在使用的下拉框。
-    connect(&project_, &ProjectController::dataChanged, this, [this] { setEnabled(false); });
+    connect(&project_, &ProjectController::dataChanged, this, [this] { error_->clear(); setEnabled(false); });
     connect(&project_, &ProjectController::dataChanged, this, &ConstraintPanel::refresh,Qt::QueuedConnection);
     refresh();
 }
@@ -129,7 +130,9 @@ void ConstraintPanel::refresh() {
             const int row = courses_->rowCount();
             courses_->insertRow(row);
             auto* item = new QTableWidgetItem(QString::fromStdString(representative.code()+" · "+representative.name()));
-            item->setFlags(fixed ? Qt::ItemIsSelectable : Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
+            Qt::ItemFlags flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+            if (!fixed && !project_.readOnly()) { flags |= Qt::ItemIsUserCheckable; }
+            item->setFlags(flags);
             item->setData(Qt::UserRole,QString::fromStdString(key));
             item->setToolTip(fixed ? "学校固定课程，不能取消必选或选择其他教学班" : item->text());
             item->setCheckState(constraints.requiredCourseKeys.count(key) ? Qt::Checked : Qt::Unchecked);
@@ -145,7 +148,7 @@ void ConstraintPanel::refresh() {
                     if (constraints.lockedTeachingClassIds.count(id)) { locked->setCurrentIndex(locked->count()-1); }
                 }
             }
-            locked->setEnabled(!fixed && locked->count() > 1);
+            locked->setEnabled(!project_.readOnly() && !fixed && locked->count() > 1);
             courses_->setCellWidget(row,1,locked);
             connect(locked,&QComboBox::currentIndexChanged,this,[this,locked,key] {
                 setLocked(key,locked->currentData().toString().toStdString());
@@ -174,6 +177,9 @@ void ConstraintPanel::refresh() {
             forbidden_->setItem(row,column,item);
         }
     }
+    // 只禁用修改控件，保留表格滚动、选择和查看能力。
+    for (auto* input : inputs_) { input->setEnabled(!project_.readOnly()); }
+    remove_->setEnabled(!project_.readOnly() && forbidden_->currentRow() >= 0);
     setEnabled(true);
 }
 void ConstraintPanel::apply(UserConstraints constraints) {
