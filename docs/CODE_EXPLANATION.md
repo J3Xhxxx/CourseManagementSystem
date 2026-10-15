@@ -169,11 +169,11 @@ for (size_t i = 0; i < n; ++i)
 2. 再对所有 `i < j` 的教学班对调用一次 `analyze`，共 n(n-1)/2 次。`j` 从 `i + 1` 开始，保证每一对只比较一次。
 3. 无向图的一条边在两个端点的邻接表里各存一份，但 `edgeCount_` 只加 1。
 
-建图复杂度为 O(n² × B)，B 为位图整数个数。每次增删改教学班后，`TeachingClassService` 会重新建图。
+整图构建需要两两比较全部教学班。现在单班新增、修改只比较该班与其他 n−1 个班，保留其他班之间的边；删除时只清理关联的双向记录。批量导入和 JSON 读取仍整图构建。
 
 ### 3.3 和搜索的关系
 
-冲突图主要给界面“教学班冲突”页使用，显示某个班与哪些班互斥、为什么互斥。搜索算法 `ScheduleGenerator` 不查冲突图，而是直接用位图判断冲突，原因是搜索中要判断的是“候选班”与“**已选所有班的时间并集**”是否冲突，一次位图求交就够了，比逐条查边快。
+冲突图同时用于界面展示和搜索中的前向检查。前向检查沿所选班的邻接表排除冲突候选；DFS 判断候选与“已选所有班的时间并集”是否冲突时，仍使用位图求交。
 
 ---
 
@@ -254,6 +254,7 @@ SearchResult ScheduleGenerator::generate(const TeachingClassService& project, co
 | `active_[i][v]` | 第 i 门课的第 v 个候选是否还有效（前向检查用） |
 | `remaining_[i]` | 第 i 门课还剩几个有效候选（前向检查用） |
 | `removed_` | 前向检查的删除记录栈，回溯时用来恢复 |
+| `candidatePositions_` | 教学班 ID 到 `(课程下标, 候选下标)` 的散列表，用于从冲突邻居定位候选 |
 
 `run()` 的流程：
 
@@ -339,10 +340,14 @@ MRV 每次都要重新扫描所有未选课程的所有候选，单次选择的�
 
 ### 5.5 forwardCheck()：前向检查
 
-每选定一个班 `chosen`，就去看所有**还没选的课**，把其中与 `chosen` 时间冲突的候选标记为无效：
+建立候选域时，把本次有效候选的 ID 和位置存入 `candidatePositions_`。每选定一个班 `chosen`，只遍历它在冲突图中的邻居，定位并停用其中尚未选课的有效候选：
 
 ```cpp
-if (active_[i][v] && chosen 与 domains_[i][v] 冲突) {
+for (const auto& edge : project_.graph().neighbors(chosen->id())) {
+    auto position = candidatePositions_.find(edge.neighborId);
+    if (position == candidatePositions_.end()) { continue; }
+    const auto [i, v] = position->second;
+    if (selected_[i] || !active_[i][v]) { continue; }
     active_[i][v] = false;
     --remaining_[i];
     removed_.push_back({i, v});      // 记下来，回溯时恢复
@@ -352,6 +357,8 @@ if (active_[i][v] && chosen 与 domains_[i][v] 冲突) {
 如果某门课的候选被删光（`remaining_[i] == 0`），说明“选了 chosen 之后这门课无班可选”，不用等搜到那门课才发现，现在就可以剪枝（剪枝 2），并记一次 `domainWipeouts`。
 
 和普通回溯相比，前向检查把“将来一定会发生的冲突”提前到现在发现，搜索树会小很多。
+
+邻接表避免了逐个扫描无关候选和重复计算位图交集。图中可能还有未勾选课程、被固定课表或禁止时间过滤掉的班，因此查不到候选位置时直接跳过。同课程互斥邻居也会跳过，因为 `chosen` 所在课程已被选定。
 
 ### 5.6 removed_ 与 restore()：可撤销的删除
 

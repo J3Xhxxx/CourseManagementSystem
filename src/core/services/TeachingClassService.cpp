@@ -67,10 +67,11 @@ void TeachingClassService::replaceTeachingClasses(vector<TeachingClass> teaching
     }
     auto constraints = constraints_;
     reconcile(teachingClasses, constraints);
-    commitData(move(teachingClasses), move(constraints));
+    ConflictGraph graph(teachingClasses);
+    commitData(move(teachingClasses), move(constraints), move(graph));
 }
-void TeachingClassService::commitData(vector<TeachingClass> teachingClasses, UserConstraints constraints) {
-    // 在候选项目中重建索引和冲突图，全部校验通过后交换，失败时原项目不变。
+void TeachingClassService::commitData(vector<TeachingClass> teachingClasses, UserConstraints constraints, ConflictGraph graph) {
+    // 重建 ID 索引并接收已维护的图，校验通过后再交换到正式项目。
     TeachingClassService candidate(semesterWeeks_);
     set<string> fixedCourses;
     for (size_t i = 0; i < teachingClasses.size(); ++i) {
@@ -81,7 +82,7 @@ void TeachingClassService::commitData(vector<TeachingClass> teachingClasses, Use
             throw invalid_argument("同一课程不能有两个学校固定教学班");
         }
     }
-    candidate.graph_ = ConflictGraph(teachingClasses);// 重建冲突图
+    candidate.graph_ = move(graph);
     candidate.teachingClasses_ = move(teachingClasses);
     constraints.validate(candidate);
     candidate.constraints_ = move(constraints);
@@ -97,7 +98,11 @@ void TeachingClassService::setConstraints(UserConstraints constraints) {
 void TeachingClassService::addTeachingClass(TeachingClass teachingClass) {
     auto teachingClasses = teachingClasses_;
     teachingClasses.push_back(move(teachingClass));
-    replaceTeachingClasses(move(teachingClasses));
+    auto constraints = constraints_;
+    reconcile(teachingClasses, constraints);
+    auto graph = graph_;
+    graph.addTeachingClass(teachingClasses.back(), teachingClasses_);
+    commitData(move(teachingClasses), move(constraints), move(graph));
 }
 void TeachingClassService::updateTeachingClass(const string& oldId, TeachingClass replacement) {
     const auto index = teachingClassIndex_.at(oldId);
@@ -117,13 +122,19 @@ void TeachingClassService::updateTeachingClass(const string& oldId, TeachingClas
     reconcile(teachingClasses, constraints);
     // 未勾选的课程改名为新分组时，仍保持未勾选。
     if (newGroup && !required && !teachingClasses[index].isFixed()) { constraints.requiredCourseKeys.erase(newKey); }
-    commitData(move(teachingClasses), move(constraints));
+    auto graph = graph_;
+    graph.updateTeachingClass(oldId, teachingClasses[index], teachingClasses);
+    commitData(move(teachingClasses), move(constraints), move(graph));
 }
 void TeachingClassService::removeTeachingClass(const string& id) {
     const auto index = teachingClassIndex_.at(id);
     if (teachingClasses_[index].isFixed()) { throw invalid_argument("学校固定课程不能修改或删除"); }
     auto teachingClasses = teachingClasses_;
     teachingClasses.erase(teachingClasses.begin() + static_cast<ptrdiff_t>(index));
-    replaceTeachingClasses(move(teachingClasses));
+    auto constraints = constraints_;
+    reconcile(teachingClasses, constraints);
+    auto graph = graph_;
+    graph.removeTeachingClass(id);
+    commitData(move(teachingClasses), move(constraints), move(graph));
 }
 }

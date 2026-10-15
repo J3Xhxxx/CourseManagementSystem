@@ -22,10 +22,14 @@ project.addTeachingClass(teachingClass);
 | TeachingClass | 完整教学班：代码、名称、学分、教师、isFixed、多个 Meeting 和缓存的时间位图 |
 | Meeting | 一条周期性安排：显式周次、星期、起止节次、教室 |
 | TimeBitSet | 周次 × 星期 × 节次的时间集合，支持交并、计数和反向解析 |
-| TeachingClassService | 仅持有教学班集合及其索引；原子增删改、重建冲突图、维护约束 |
+| TeachingClassService | 持有教学班集合及其索引；增删改时维护相关冲突边、维护约束 |
 | UserConstraints | 必选分组键、锁定教学班 ID、禁止时间位图 |
 
 TeachingClassService 提供 `teachingClasses / findTeachingClass / addTeachingClass / updateTeachingClass / removeTeachingClass / replaceTeachingClasses`。失败时保留模型、索引、图和约束；调用者可以传入服务自身持有的 ID 引用。
+
+2026-10-15：单个教学班新增时只检测它与其他班的冲突；修改时清理旧 ID 的关联边，再计算新关联边；删除时直接移除双向关联边，不重新检测冲突。其他教学班之间的边保留。批量 CSV 导入和 JSON 读取仍整图构建。
+
+一次新增或修改只需与其余 M−1 个班比较，避免重新进行全体两两比较。服务仍复制数据和图，在校验成功后提交；这里减少的是冲突检测次数，图复制仍有开销。
 
 构造函数在 `meetings` 后接受 `semesterWeeks = 20, isFixed = false`。`isFixed()` 读取学校固定标记；服务的 `fixedTeachingClassForCourse(key)` 查找某课程的固定班，`fixedSchedule()` 汇总固定班 ID 及占用位图。
 
