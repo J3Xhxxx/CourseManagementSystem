@@ -15,7 +15,7 @@ namespace planner::ui {
 CandidatePanel::CandidatePanel(ProjectController& project, SearchController& search, QWidget* parent)
     : QWidget(parent), project_(project), search_(search) {
     auto* layout = new QVBoxLayout(this);
-    auto* hint = new QLabel("保留学校固定课表，按必选、个人锁定和禁止时间生成。\n每门必选课程恰选一个班，方案尚未按偏好排序。", this);
+    auto* hint = new QLabel("保留学校固定课表，按必选、个人锁定和禁止时间生成。\n每门必选课程恰选一个班；方案按“选课约束”中的偏好优先级排序，只保留较优的前 K 个。", this);
     hint->setWordWrap(true);
     layout->addWidget(hint);
     auto* limits = new QFormLayout;
@@ -94,19 +94,23 @@ void CandidatePanel::updateState() {
     }
     const auto& result = *search_.result();
     const auto count = result.schedules.size();
+    const QString order = QString::fromStdString(preferenceText(project_.project().constraints().preferenceOrder.values));
     switch (result.status) {
     case SearchStatus::Complete:
-        status_->setText(count ? QString("搜索完成，共 %1 个合法方案。").arg(count)
+        status_->setText(count ? QString("搜索完成：共 %1 个合法方案（少于保留上限，已全部显示）。\n排序优先级：%2")
+                                    .arg(count).arg(order)
                               : "搜索完成：当前课程集合没有合法方案。");
         break;
     case SearchStatus::SolutionLimit:
-        status_->setText(QString("达到保留上限，显示前 %1 个合法方案；仍有其他方案。").arg(count));
+        status_->setText(QString("搜索完成：共 %1 个合法方案，按偏好优先级保留较优的前 %2 个。\n排序优先级：%3")
+            .arg(result.totalSolutions).arg(count).arg(order));
         break;
     case SearchStatus::NodeLimit:
-        status_->setText(QString("达到尝试上限，找到 %1 个合法方案；搜索未完成。").arg(count));
+        status_->setText(QString("达到尝试上限，搜索未完成；当前显示已探索部分中较优的 %1 个方案，不能视为全局最优。\n排序优先级：%2")
+            .arg(count).arg(order));
         break;
     case SearchStatus::Cancelled:
-        status_->setText(QString("搜索已取消，保留 %1 个合法方案；搜索未完成。").arg(count));
+        status_->setText(QString("搜索已取消，搜索未完成；保留已找到的 %1 个方案，不能视为全局最优。").arg(count));
         break;
     }
     QStringList explanations;
@@ -152,13 +156,15 @@ void CandidatePanel::updateResults() {
             const auto& result = *search_.result();
             for (size_t i = 0; i < result.schedules.size(); ++i) {
                 const auto& candidate = result.schedules[i];
-                list_->addItem(QString("方案 %1 · %2 门课程 · %3 个全学期时段")
-                    .arg(i+1).arg(candidate.selectedTeachingClassIds.size()).arg(candidate.occupiedTimeBitmap.count()));
+                list_->addItem(QString("方案 %1 · %2 门课程 · %3")
+                    .arg(i+1).arg(candidate.selectedTeachingClassIds.size())
+                    .arg(QString::fromStdString(scheduleMetricsText(candidate.evaluation))));
             }
             const auto& stats = result.statistics;
-            statistics_->setText(QString("尝试 %1 次 · 剪枝 %2 次\n提前排除 %3 个候选 · %4 次无后续选择\n得到 %5 个完整组合 · 用时 %6 ms")
+            statistics_->setText(QString("搜索得到 %1 个完整合法方案 · 保留 %2 个\n尝试 %3 次 · 剪枝 %4 次\n提前排除 %5 个候选 · %6 次无后续选择 · 用时 %7 ms")
+                .arg(result.totalSolutions).arg(result.schedules.size())
                 .arg(stats.visitedNodes).arg(stats.prunedBranches).arg(stats.candidateRemovals).arg(stats.domainWipeouts)
-                .arg(stats.completeLeaves).arg(stats.elapsedMilliseconds,0,'f',1));
+                .arg(stats.elapsedMilliseconds,0,'f',1));
         }
         list_->setCurrentRow(list_->count() ? 0 : -1);
     }
@@ -170,13 +176,17 @@ void CandidatePanel::showCandidate(int index) {
     details_->clear();
     // 列表与当前结果同步重建，有选中行时结果一定存在。
     if (index >= 0) {
+        const auto& schedule = search_.result()->schedules[static_cast<size_t>(index)];
         QStringList names;
-        for (const auto& id : search_.result()->schedules[static_cast<size_t>(index)].selectedTeachingClassIds) {
+        for (const auto& id : schedule.selectedTeachingClassIds) {
             const auto* teachingClass = project_.project().findTeachingClass(id);
             names << QString::fromStdString(teachingClass->name() + " · " + teachingClass->teacher());
         }
-        details_->setText(names.join("\n"));
-        details_->setToolTip(names.join("\n"));
+        const QString text = QString::fromStdString(scheduleMetricsText(schedule.evaluation))
+            + "\n排序优先级：" + QString::fromStdString(preferenceText(project_.project().constraints().preferenceOrder.values))
+            + "\n" + names.join("\n");
+        details_->setText(text);
+        details_->setToolTip(text);
     }
     emit candidateSelected(index);
 }

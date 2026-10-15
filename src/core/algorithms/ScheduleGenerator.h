@@ -13,7 +13,7 @@ enum class SearchStatus { Complete, SolutionLimit, NodeLimit, Cancelled };
 enum class SearchStrategy { Backtracking, Mrv, MrvForwardChecking };
 
 struct SearchOptions {
-    size_t maxSolutions = 100;  // 最多保留多少个方案
+    size_t maxSolutions = 100;  // 最多保留多少个方案（Top-K 的 K）
     uint64_t maxNodes = 100000; // 最多尝试选择多少次教学班
     // 返回 true 表示用户要求取消；在搜索线程中调用。
     function<bool()> cancelled;
@@ -42,13 +42,18 @@ struct ConstraintConflict {
 };
 
 struct SearchResult {
+    // 按偏好优先级从优到差排列的 Top-K 方案；K 为 SearchOptions::maxSolutions。
     vector<Schedule> schedules;
     SearchStatus status = SearchStatus::Complete;
     SearchStatistics statistics;
+    // 搜索过程中遇到的全部完整合法方案数，可能大于保留数。
+    uint64_t totalSolutions = 0;
     // 经锁定、禁止时间、固定课表过滤后，已无可选班的必选课程。
     vector<string> coursesWithoutCandidates;
     vector<ConstraintConflict> constraintConflicts;
-    bool complete() const { return status == SearchStatus::Complete; }
+    bool complete() const { return status == SearchStatus::Complete || status == SearchStatus::SolutionLimit; }
+    // 搜索跑完全部组合时，保留的方案就是全局最优的前 K 个（Complete 表示方案不足 K 个）。
+    bool globallyRanked() const { return complete(); }
 };
 
 class ScheduleGenerator {

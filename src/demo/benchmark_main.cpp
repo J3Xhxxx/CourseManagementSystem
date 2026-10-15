@@ -71,7 +71,7 @@ void compare(const string& name, const TeachingClassService& project) {
     vector<Schedule> brute = BruteForceGenerator::generate(project, 100000);
     auto end = chrono::steady_clock::now();
     double elapsed = chrono::duration<double, milli>(end - start).count();
-    cout << name << ",BruteForce," << brute.size() << ",," << combinations << ",0," << elapsed << ",\n";
+    cout << name << ",BruteForce," << brute.size() << ',' << brute.size() << ",," << combinations << ",0," << elapsed << ",\n";
 
     const SearchStrategy strategies[3] = {SearchStrategy::Backtracking, SearchStrategy::Mrv, SearchStrategy::MrvForwardChecking};
     const char* strategyNames[3] = {"Backtracking", "MRV", "MRV+FC"};
@@ -82,9 +82,9 @@ void compare(const string& name, const TeachingClassService& project) {
         options.maxNodes = 1000000;
         SearchResult result = ScheduleGenerator::generate(project, options);
         const SearchStatistics& stats = result.statistics;
-        // 上限设得足够大，正常情况下都能搜完；方案数应与暴力枚举相同。
-        bool same = result.complete() && result.schedules.size() == brute.size();
-        cout << name << ',' << strategyNames[i] << ',' << result.schedules.size() << ','
+        // 上限设得足够大，正常情况下都能搜完；合法方案总数应与暴力枚举相同。
+        bool same = result.complete() && result.totalSolutions == brute.size();
+        cout << name << ',' << strategyNames[i] << ',' << result.totalSolutions << ',' << result.schedules.size() << ','
              << stats.visitedNodes << ',' << stats.completeLeaves << ',' << stats.prunedBranches << ','
              << stats.elapsedMilliseconds << ',' << (same ? "yes" : "no") << '\n';
     }
@@ -94,7 +94,7 @@ void compare(const string& name, const TeachingClassService& project) {
 
 int main() {
     cout << fixed << setprecision(3);
-    cout << "case,strategy,solutions,visited_nodes,complete_combinations,pruned_branches,elapsed_ms,same_as_brute\n";
+    cout << "case,strategy,solutions,kept,visited_nodes,complete_combinations,pruned_branches,elapsed_ms,same_as_brute\n";
     compare("independent", independent());
     compare("late_bottleneck_unsatisfiable", lateBottleneck(false));
     compare("late_bottleneck_satisfiable", lateBottleneck(true));

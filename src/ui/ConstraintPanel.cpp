@@ -7,6 +7,7 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QTableWidget>
@@ -77,23 +78,41 @@ ConstraintPanel::ConstraintPanel(ProjectController& project, QWidget* parent)
     forbidden_->setEditTriggers(QAbstractItemView::NoEditTriggers);
     forbidden_->setMinimumHeight(100);
     forbiddenLayout->addWidget(forbidden_,1);
-    remove_ = new QPushButton("删除选中的禁止时间",forbiddenBox);
-    remove_->setEnabled(false);
-    forbiddenLayout->addWidget(remove_);
-    inputs_ = {weeks_, pattern_, weekday_, start_, end_, add, clearRange};
+    auto* remove = new QPushButton("删除选中的禁止时间",forbiddenBox);
+    remove->setEnabled(false);
+    forbiddenLayout->addWidget(remove);
     error_ = new QLabel(forbiddenBox);
     error_->setTextFormat(Qt::PlainText);
     error_->setWordWrap(true);
     error_->setStyleSheet("color: #a12622;");
     forbiddenLayout->addWidget(error_);
+    // 软偏好优先级单独成组：只影响合法方案之间的排序，不影响哪些方案合法。
+    auto* preferenceBox = new QGroupBox("方案偏好优先级（软偏好，不影响合法性）",this);
+    auto* preferenceLayout = new QVBoxLayout(preferenceBox);
+    layout->addWidget(preferenceBox);
+    preferenceHint_ = new QLabel("从上到下依次比较：上一项相同的方案才继续比下一项。",preferenceBox);
+    preferenceHint_->setWordWrap(true);
+    preferenceLayout->addWidget(preferenceHint_);
+    preference_ = new QListWidget(preferenceBox);
+    preference_->setSelectionMode(QAbstractItemView::SingleSelection);
+    preference_->setMaximumHeight(150);
+    preferenceLayout->addWidget(preference_);
+    auto* preferenceButtons = new QHBoxLayout;
+    preferenceUp_ = new QPushButton("上移",preferenceBox);
+    preferenceDown_ = new QPushButton("下移",preferenceBox);
+    preferenceReset_ = new QPushButton("恢复默认顺序",preferenceBox);
+    preferenceButtons->addWidget(preferenceUp_);
+    preferenceButtons->addWidget(preferenceDown_);
+    preferenceButtons->addWidget(preferenceReset_);
+    preferenceLayout->addLayout(preferenceButtons);
     connect(courses_, &QTableWidget::itemChanged, this, [this](QTableWidgetItem* item) {
         if (item->column() == 0) { setRequired(item->data(Qt::UserRole).toString().toStdString(),item->checkState() == Qt::Checked); }
     });
     connect(add, &QPushButton::clicked, this, [this] { editForbidden(true); });
     connect(clearRange, &QPushButton::clicked, this, [this] { editForbidden(false); });
-    connect(remove_, &QPushButton::clicked, this, &ConstraintPanel::removeSelectedForbidden);
-    connect(forbidden_, &QTableWidget::itemSelectionChanged, this, [this] {
-        remove_->setEnabled(!project_.readOnly() && forbidden_->currentRow() >= 0);
+    connect(remove, &QPushButton::clicked, this, &ConstraintPanel::removeSelectedForbidden);
+    connect(forbidden_, &QTableWidget::itemSelectionChanged, this, [this,remove] {
+        remove->setEnabled(forbidden_->currentRow() >= 0);
     });
     connect(forbidden_, &QTableWidget::cellDoubleClicked, this, [this](int row,int) {
         const auto& group = groups_[static_cast<size_t>(row)];
@@ -105,8 +124,12 @@ ConstraintPanel::ConstraintPanel(ProjectController& project, QWidget* parent)
         start_->setValue(group.front().period);
         end_->setValue(group.front().period);
     });
+    connect(preference_, &QListWidget::itemSelectionChanged, this, &ConstraintPanel::updatePreferenceButtons);
+    connect(preferenceUp_, &QPushButton::clicked, this, [this] { movePreference(-1); });
+    connect(preferenceDown_, &QPushButton::clicked, this, [this] { movePreference(1); });
+    connect(preferenceReset_, &QPushButton::clicked, this, &ConstraintPanel::resetPreference);
     // 先停用旧控件，再排队重建；直接刷新会在信号处理中删除正在使用的下拉框。
-    connect(&project_, &ProjectController::dataChanged, this, [this] { error_->clear(); setEnabled(false); });
+    connect(&project_, &ProjectController::dataChanged, this, [this] { setEnabled(false); });
     connect(&project_, &ProjectController::dataChanged, this, &ConstraintPanel::refresh,Qt::QueuedConnection);
     refresh();
 }
@@ -130,9 +153,7 @@ void ConstraintPanel::refresh() {
             const int row = courses_->rowCount();
             courses_->insertRow(row);
             auto* item = new QTableWidgetItem(QString::fromStdString(representative.code()+" · "+representative.name()));
-            Qt::ItemFlags flags = Qt::ItemIsEnabled | Qt::ItemIsSelectable;
-            if (!fixed && !project_.readOnly()) { flags |= Qt::ItemIsUserCheckable; }
-            item->setFlags(flags);
+            item->setFlags(fixed ? Qt::ItemIsSelectable : Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsUserCheckable);
             item->setData(Qt::UserRole,QString::fromStdString(key));
             item->setToolTip(fixed ? "学校固定课程，不能取消必选或选择其他教学班" : item->text());
             item->setCheckState(constraints.requiredCourseKeys.count(key) ? Qt::Checked : Qt::Unchecked);
@@ -148,7 +169,7 @@ void ConstraintPanel::refresh() {
                     if (constraints.lockedTeachingClassIds.count(id)) { locked->setCurrentIndex(locked->count()-1); }
                 }
             }
-            locked->setEnabled(!project_.readOnly() && !fixed && locked->count() > 1);
+            locked->setEnabled(!fixed && locked->count() > 1);
             courses_->setCellWidget(row,1,locked);
             connect(locked,&QComboBox::currentIndexChanged,this,[this,locked,key] {
                 setLocked(key,locked->currentData().toString().toStdString());
@@ -158,6 +179,24 @@ void ConstraintPanel::refresh() {
     summary_->setText(QString("固定 %1 门 · 必选 %2 门 · 个人锁定 %3 个班 · 禁止 %4 个全学期时段")
         .arg(fixedCount).arg(constraints.requiredCourseKeys.size())
         .arg(constraints.lockedTeachingClassIds.size()).arg(constraints.forbiddenTimes.count()));
+    // 偏好优先级列表：保持当前选中项，重排后仍停在同一个指标上。
+    MetricId selected = MetricId::EarlyMorningCount;
+    bool hasSelection = false;
+    if (const auto* current = preference_->currentItem()) {
+        selected = static_cast<MetricId>(current->data(Qt::UserRole).toInt());
+        hasSelection = true;
+    }
+    {
+        QSignalBlocker blocker(preference_);
+        preference_->clear();
+        for (const MetricId id : constraints.preferenceOrder.values) {
+            auto* item = new QListWidgetItem(QString::fromUtf8(metricLabel(id)),preference_);
+            item->setData(Qt::UserRole,static_cast<int>(id));
+            if (hasSelection && id == selected) { preference_->setCurrentItem(item); }
+        }
+        if (!preference_->currentItem() && preference_->count()) { preference_->setCurrentRow(0); }
+    }
+    updatePreferenceButtons();
     map<pair<int,int>,vector<TimeSlot>> grouped;
     for (const auto& time : constraints.forbiddenTimes.occupiedSlots()) { grouped[{time.weekday,time.period}].push_back(time); }
     forbidden_->setRowCount(0);
@@ -177,9 +216,6 @@ void ConstraintPanel::refresh() {
             forbidden_->setItem(row,column,item);
         }
     }
-    // 只禁用修改控件，保留表格滚动、选择和查看能力。
-    for (auto* input : inputs_) { input->setEnabled(!project_.readOnly()); }
-    remove_->setEnabled(!project_.readOnly() && forbidden_->currentRow() >= 0);
     setEnabled(true);
 }
 void ConstraintPanel::apply(UserConstraints constraints) {
@@ -229,5 +265,25 @@ void ConstraintPanel::removeSelectedForbidden() {
     for (const auto& time : groups_[static_cast<size_t>(row)]) { removed.set(time); }
     constraints.forbiddenTimes.subtract(removed);
     apply(std::move(constraints));
+}
+// 把选中指标上移或下移一位，再整体写回约束；只改变合法方案之间的排序。
+void ConstraintPanel::movePreference(int offset) {
+    const int row = preference_->currentRow();
+    const int target = row + offset;
+    if (row < 0 || target < 0 || target >= preference_->count()) { return; }
+    auto constraints = project_.project().constraints();
+    swap(constraints.preferenceOrder.values[static_cast<size_t>(row)],
+        constraints.preferenceOrder.values[static_cast<size_t>(target)]);
+    apply(std::move(constraints));
+}
+void ConstraintPanel::resetPreference() {
+    auto constraints = project_.project().constraints();
+    constraints.preferenceOrder = PreferenceOrder::defaultOrder();
+    apply(std::move(constraints));
+}
+void ConstraintPanel::updatePreferenceButtons() {
+    const int row = preference_->currentRow();
+    preferenceUp_->setEnabled(row > 0);
+    preferenceDown_->setEnabled(row >= 0 && row + 1 < preference_->count());
 }
 }

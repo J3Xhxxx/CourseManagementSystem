@@ -1,4 +1,5 @@
 #include "io/JsonProjectStore.h"
+#include "core/algorithms/ScheduleEvaluator.h"
 #include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -71,8 +72,13 @@ QByteArray JsonProjectStore::serialize(const TeachingClassService& project) {
     for (const auto& time : project.constraints().forbiddenTimes.occupiedSlots()) {
         forbiddenTimes.append(QJsonObject{{"week", time.week}, {"weekday", time.weekday}, {"period", time.period}});
     }
+    // 软偏好优先级：按从高到低保存指标名称，读取时按同一顺序还原。
+    QJsonArray preferences;
+    for (const MetricId id : project.constraints().preferenceOrder.values) {
+        preferences.append(QString::fromUtf8(metricLabel(id)));
+    }
     const QJsonObject constraints{{"requiredCourseKeys", requiredCourseKeys}, {"lockedTeachingClassIds", lockedTeachingClassIds},
-        {"forbiddenTimes", forbiddenTimes}};
+        {"forbiddenTimes", forbiddenTimes}, {"preferences", preferences}};
     return QJsonDocument(QJsonObject{{"version", formatVersion}, {"semesterWeeks", project.semesterWeeks()},
         {"teachingClasses", teachingClasses}, {"constraints", constraints}}).toJson(QJsonDocument::Indented);
 }
@@ -113,7 +119,7 @@ TeachingClassService JsonProjectStore::deserialize(const QByteArray& json) {
         } catch (const exception& e) { invalid(path, QString::fromUtf8(e.what())); }
     }
     project.replaceTeachingClasses(move(teachingClasses));
-    const auto entry = object(root["constraints"], {"requiredCourseKeys", "lockedTeachingClassIds", "forbiddenTimes"}, "constraints");
+    const auto entry = object(root["constraints"], {"requiredCourseKeys", "lockedTeachingClassIds", "forbiddenTimes", "preferences"}, "constraints");
     UserConstraints constraints(project.semesterWeeks());
     const auto readIds = [&](const char* field, set<string>& ids) {
         const auto path = QStringLiteral("constraints.") + QString::fromLatin1(field);
@@ -130,6 +136,24 @@ TeachingClassService JsonProjectStore::deserialize(const QByteArray& json) {
         const auto time = object(times[i], {"week", "weekday", "period"}, path);
         constraints.forbiddenTimes.set({integer(time["week"], path + ".week"), integer(time["weekday"], path + ".weekday"),
             integer(time["period"], path + ".period")});
+    }
+    const auto preferences = array(entry["preferences"], "constraints.preferences");
+    if (preferences.size() != static_cast<qsizetype>(metricIds().size())) {
+        invalid("constraints.preferences", QStringLiteral("必须恰好包含六项评价指标"));
+    }
+    constraints.preferenceOrder.values.clear();
+    for (qsizetype i = 0; i < preferences.size(); ++i) {
+        const auto path = QStringLiteral("constraints.preferences[%1]").arg(i);
+        MetricId id;
+        if (!metricFromLabel(jsonString(preferences[i], path).toStdString(), id)) {
+            invalid(path, QStringLiteral("不是已知的评价指标"));
+        }
+        constraints.preferenceOrder.values.push_back(id);
+    }
+    try {
+        constraints.preferenceOrder.validate();
+    } catch (const exception& e) {
+        invalid("constraints.preferences", QString::fromUtf8(e.what()));
     }
     project.setConstraints(move(constraints));
     return project;

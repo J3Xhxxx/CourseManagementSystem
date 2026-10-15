@@ -24,8 +24,7 @@
 using namespace std;
 
 namespace planner::ui {
-MainWindow::MainWindow(const QString& accountName, const QString& accountsDirectory, QWidget* parent)
-    : QMainWindow(parent), controller_(accountName, accountsDirectory, this), search_(controller_,this) {
+MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent), controller_(this), search_(controller_,this) {
     resize(1480, 800);
     setMinimumSize(1100, 620);
     auto* splitter = new QSplitter(this);
@@ -55,20 +54,13 @@ MainWindow::MainWindow(const QString& accountName, const QString& accountsDirect
         connect(result, &QAction::triggered, this, callback);
         return result;
     };
-    writeActions_ << action("新建", QKeySequence::New, [this] { newProject(); });
-    action("查看课表…", QKeySequence::Open, [this] { openProject(); });
-    own_ = action("我的课表", {}, [this] {
-        if (maybeSave()) { execute([this] { controller_.openOwnProject(); }); }
-    });
-    writeActions_ << action("保存", QKeySequence::Save, [this] { saveProject(); });
-    writeActions_ << action("导入 CSV…", QKeySequence("Ctrl+I"), [this] { importCsv(); });
-    action("切换账号", {}, [this] {
-        // closeEvent 统一处理保存；取消或保存失败时仍留在当前账号。
-        switchingAccount_ = true;
-        if (!close()) { switchingAccount_ = false; }
-    });
+    action("新建", QKeySequence::New, [this] { newProject(); });
+    action("打开…", QKeySequence::Open, [this] { openProject(); });
+    action("保存", QKeySequence::Save, [this] { saveProject(); });
+    action("另存为…", QKeySequence::SaveAs, [this] { saveProject(true); });
+    action("导入 CSV…", QKeySequence("Ctrl+I"), [this] { importCsv(); });
     bar->addSeparator();
-    writeActions_ << action("新增教学班", {}, [this] { editTeachingClass(true); });
+    action("新增教学班", {}, [this] { editTeachingClass(true); });
     edit_ = action("编辑", {}, [this] { editSelection(); });
     remove_ = action("删除", QKeySequence::Delete, [this] { removeSelection(); });
     bar->addSeparator();
@@ -97,6 +89,7 @@ MainWindow::MainWindow(const QString& accountName, const QString& accountsDirect
     connect(teachingClasses_, &TeachingClassPanel::editRequested, this, &MainWindow::editSelection);
     connect(conflicts_, &ConflictPanel::teachingClassActivated, teachingClasses_, &TeachingClassPanel::selectTeachingClass);
     refresh();
+    statusBar()->showMessage("直接新增教学班，或导入 CSV 文件。");
 }
 void MainWindow::refresh() {
     const auto& project = controller_.project();
@@ -105,28 +98,20 @@ void MainWindow::refresh() {
         teachingClasses_->setProject(project);
     }
     showSelection();
-    const auto owner = QFileInfo(controller_.filePath()).completeBaseName();
-    const auto mode = controller_.readOnly() ? "（只读）" : "";
-    setWindowTitle(QString("%1 的课表%2[*] — 登录：%3 — 个人选课与冲突分析")
-        .arg(owner, mode, controller_.accountName()));
+    const auto name = controller_.filePath().isEmpty() ? QString("未命名项目") : QFileInfo(controller_.filePath()).fileName();
+    setWindowTitle(name + "[*] — 个人选课与冲突分析");
     setWindowModified(controller_.modified());
-    for (auto* action : writeActions_) { action->setEnabled(!controller_.readOnly()); }
-    own_->setEnabled(controller_.readOnly());
     totals_->setText(QString("%1 周  |  %2 门课程  |  %3 个教学班  |  %4 条冲突边")
         .arg(project.semesterWeeks()).arg(project.courseKeys().size()).arg(project.teachingClasses().size()).arg(project.graph().edgeCount()));
-    if (controller_.readOnly()) {
-        statusBar()->showMessage("正在只读查看他人的课表；点击“我的课表”返回后才能修改和保存。");
-    } else if (project.teachingClasses().empty()) {
-        statusBar()->showMessage("直接新增教学班，或导入 CSV；保存将写入：" + controller_.accountFilePath());
-    } else {
+    if (!project.teachingClasses().empty()) {
         statusBar()->showMessage("在“选课约束”设置必选课程、锁定教学班和禁止时间，再生成方案。");
     }
 }
 void MainWindow::showSelection() {
     const auto& project = controller_.project();
     const auto* teachingClass = project.findTeachingClass(teachingClasses_->teachingClassId().toStdString());
-    edit_->setEnabled(!controller_.readOnly() && teachingClass && !teachingClass->isFixed());
-    remove_->setEnabled(!controller_.readOnly() && teachingClass && !teachingClass->isFixed());
+    edit_->setEnabled(teachingClass && !teachingClass->isFixed());
+    remove_->setEnabled(teachingClass && !teachingClass->isFixed());
     if (!viewingCandidate_) {
         timetable_->setTeachingClass(project, teachingClass);
     }
@@ -170,15 +155,27 @@ void MainWindow::newProject() {
     if (ok) { execute([&] { controller_.newProject(weeks); }); }
 }
 void MainWindow::openProject() {
-    const auto path = QFileDialog::getOpenFileName(this, "查看课表（他人的课表只读）",
-        QFileInfo(controller_.accountFilePath()).absolutePath(), "选课项目 (*.json)");
+    const auto path = QFileDialog::getOpenFileName(this, "打开选课项目", {}, "选课项目 (*.json)");
     if (path.isEmpty() || !maybeSave()) { return; }
-    execute([&] { controller_.openProject(path); });
+    execute([&] {
+        controller_.openProject(path);
+        statusBar()->showMessage("已打开：" + path);
+    });
 }
-bool MainWindow::saveProject() {
+bool MainWindow::saveProject(bool saveAs) {
+    auto path = controller_.filePath();
+    if (saveAs || path.isEmpty()) {
+        QFileDialog dialog(this, "保存选课项目");
+        dialog.setAcceptMode(QFileDialog::AcceptSave);
+        dialog.setNameFilter("选课项目 (*.json)");
+        dialog.setDefaultSuffix("json");
+        dialog.selectFile(path.isEmpty() ? "选课项目.json" : path);
+        if (dialog.exec() != QDialog::Accepted) { return false; }
+        path = dialog.selectedFiles().front();
+    }
     return execute([&] {
-        controller_.saveProject();
-        statusBar()->showMessage("已保存：" + controller_.accountFilePath());
+        controller_.saveProject(path);
+        statusBar()->showMessage("已保存：" + path);
     });
 }
 void MainWindow::importCsv() {
@@ -191,7 +188,6 @@ void MainWindow::importCsv() {
     });
 }
 void MainWindow::editTeachingClass(bool create) {
-    if (controller_.readOnly()) { return; }
     const auto oldId = create ? QString{} : teachingClasses_->teachingClassId();
     const auto* initial = create ? nullptr : controller_.project().findTeachingClass(oldId.toStdString());
     // 双击列表也会触发编辑，固定班需要在这里拦下。
@@ -208,7 +204,6 @@ void MainWindow::editSelection() {
     editTeachingClass(false);
 }
 void MainWindow::removeSelection() {
-    if (controller_.readOnly()) { return; }
     const auto teachingClass = teachingClasses_->teachingClassId();
     QMessageBox box(QMessageBox::Question, "确认删除",
         "删除该教学班及其全部上课安排？",

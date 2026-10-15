@@ -2,7 +2,9 @@
 
 2026-09-27：按用户要求统一使用 TeachingClass 命名，相关文件、接口及 JSON 字段同步调整。
 
-2026-10-07：增加 `isFixed` 学校固定课程标记；CSV 改为上课时间数组，JSON 当前格式为 version 4。
+2026-10-07：增加 `isFixed` 学校固定课程标记；CSV 改为上课时间数组，JSON 当时格式为 version 4。
+
+2026-10-15：`UserConstraints` 增加软偏好 `preferenceOrder`（六项评价指标的优先级顺序），JSON 升为 version 5，评价与 Top-K 见 [STAGE7.md](STAGE7.md)。
 
 按最新需求移除独立的 Course 数据结构。课程代码、课程名称、学分都属于 TeachingClass；没有课程对象、课程外键或单独的课程增删改入口。
 
@@ -22,14 +24,10 @@ project.addTeachingClass(teachingClass);
 | TeachingClass | 完整教学班：代码、名称、学分、教师、isFixed、多个 Meeting 和缓存的时间位图 |
 | Meeting | 一条周期性安排：显式周次、星期、起止节次、教室 |
 | TimeBitSet | 周次 × 星期 × 节次的时间集合，支持交并、计数和反向解析 |
-| TeachingClassService | 持有教学班集合及其索引；增删改时维护相关冲突边、维护约束 |
-| UserConstraints | 必选分组键、锁定教学班 ID、禁止时间位图 |
+| TeachingClassService | 仅持有教学班集合及其索引；原子增删改、重建冲突图、维护约束 |
+| UserConstraints | 必选分组键、锁定教学班 ID、禁止时间位图、方案偏好优先级（软偏好） |
 
 TeachingClassService 提供 `teachingClasses / findTeachingClass / addTeachingClass / updateTeachingClass / removeTeachingClass / replaceTeachingClasses`。失败时保留模型、索引、图和约束；调用者可以传入服务自身持有的 ID 引用。
-
-2026-10-15：单个教学班新增时只检测它与其他班的冲突；修改时清理旧 ID 的关联边，再计算新关联边；删除时直接移除双向关联边，不重新检测冲突。其他教学班之间的边保留。批量 CSV 导入和 JSON 读取仍整图构建。
-
-一次新增或修改只需与其余 M−1 个班比较，避免重新进行全体两两比较。服务仍复制数据和图，在校验成功后提交；这里减少的是冲突检测次数，图复制仍有开销。
 
 构造函数在 `meetings` 后接受 `semesterWeeks = 20, isFixed = false`。`isFixed()` 读取学校固定标记；服务的 `fixedTeachingClassForCourse(key)` 查找某课程的固定班，`fixedSchedule()` 汇总固定班 ID 及占用位图。
 
@@ -53,6 +51,7 @@ TeachingClassService 提供 `teachingClasses / findTeachingClass / addTeachingCl
 - 修改教学班身份时迁移该班锁定。锁定班移入其他组合会使目标组合必选；若目标已有另一个锁定班，拒绝修改，保留原数据。
 - 未勾选的非固定教学班改名形成新组合，仍保持未勾选；若改为学校固定课程，则必须加入必选集合。
 - 删除教学班会清除其锁定；最后一个同组合教学班消失时，同时移除该组合的必选键。其他班及禁止时间保持原状。
+- 偏好优先级是软偏好，与教学班增删改无关：修改教学班不会重置它，删除课程也不影响它。
 
 ## 界面和文件
 
@@ -60,6 +59,6 @@ TeachingClassService 提供 `teachingClasses / findTeachingClass / addTeachingCl
 
 CSV 必须包含“上课时间”和“是否为固定课程”。时间数组 `[(周一,1),(周四,3)]` 逐项生成 Meeting；相同三元组跨行归并。同一教学班的多行记录必须使用一致学分和固定标记，整批校验成功才提交。
 
-JSON 仅支持当前 version 4，根对象直接存储 `teachingClasses` 和 `constraints`，每个教学班必须包含布尔 `isFixed`；详见 [DATA_FORMAT.md](DATA_FORMAT.md)。项目处于开发阶段，不保留旧格式读取和迁移逻辑。
+JSON 仅支持当前 version 5，根对象直接存储 `teachingClasses` 和 `constraints`，每个教学班必须包含布尔 `isFixed`，约束中必须包含六项指标的 `preferences` 顺序；详见 [DATA_FORMAT.md](DATA_FORMAT.md)。项目处于开发阶段，不保留旧格式读取和迁移逻辑。
 
 历史阶段说明中的 Course 和课程级编辑流程已由本文替代。

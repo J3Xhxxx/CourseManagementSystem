@@ -1,7 +1,8 @@
 #include "core/algorithms/ScheduleGenerator.h"
+#include "core/algorithms/ScheduleEvaluator.h"
+#include "core/structures/BoundedMaxHeap.h"
 #include <chrono>
 #include <cstdint>
-#include <unordered_map>
 
 using namespace std;
 
@@ -13,7 +14,8 @@ class Searcher {
 public:
     Searcher(const TeachingClassService& project, const SearchOptions& options)
         : project_(project), options_(options), initial_(project.fixedSchedule()),
-          occupied_(initial_.occupiedTimeBitmap) {}
+          occupied_(initial_.occupiedTimeBitmap),
+          heap_(options.maxSolutions, ScheduleAbove::from(project.constraints().preferenceOrder)) {}
     SearchResult run();
 
 private:
@@ -33,12 +35,13 @@ private:
     vector<vector<const TeachingClass*>> domains_; // domains_[i]：第 i 门课的候选教学班
     vector<const TeachingClass*> selected_; // selected_[i]：第 i 门课选中的班，未选时为 nullptr
 
-    // 以下状态只在前向检查中使用。
+    // 以下三项只在前向检查中使用。
     // 删除候选时只把 active_ 置为 false，不真正从数组中删除，回溯时容易恢复。
     vector<vector<bool>> active_;
     vector<size_t> remaining_; // 每门课还剩多少个有效候选
     vector<pair<size_t, size_t>> removed_; // 删除记录 (课程, 候选)，回溯时按栈的顺序恢复
-    unordered_map<string, pair<size_t, size_t>> candidatePositions_; // 教学班 ID -> (课程, 候选)
+    // 只保留当前较优的前 K 个方案：装满后新的方案优于堆顶（当前最差的一个）才会替换。
+    BoundedMaxHeap<Schedule, ScheduleAbove> heap_;
 };
 
 // 第一步：为每门要搜索的课程准备候选教学班，并检查不能替换的班之间有没有直接冲突。
@@ -71,9 +74,6 @@ bool Searcher::buildDomains() {
             if (locked && teachingClass != locked) { continue; }
             if (teachingClass->timeBitmap().intersects(constraints.forbiddenTimes)) { continue; }
             if (teachingClass->timeBitmap().intersects(initial_.occupiedTimeBitmap)) { continue; }
-            if (options_.strategy == SearchStrategy::MrvForwardChecking) {
-                candidatePositions_[teachingClass->id()] = {domains_.size(), domain.size()};
-            }
             domain.push_back(teachingClass);
         }
         if (domain.empty()) { result_.coursesWithoutCandidates.push_back(course); }
@@ -140,20 +140,19 @@ size_t Searcher::chooseCourse(vector<size_t>& values) {
     return best;
 }
 
-// 前向检查：只遍历 chosen 的冲突邻居，通过 ID 索引找到需要停用的候选。
+// 前向检查：删掉其他未选课程中与 chosen 时间冲突的候选。
 // 如果某门课的候选被删空，说明这样选下去一定无解，返回 false。
 bool Searcher::forwardCheck(const TeachingClass* chosen) {
-    for (const auto& edge : project_.graph().neighbors(chosen->id())) {
-        const auto position = candidatePositions_.find(edge.neighborId);
-        // 冲突图包含所有教学班，已过滤或未参与搜索的班没有候选位置。
-        if (position == candidatePositions_.end()) { continue; }
-        const auto [i, v] = position->second;
-        // 同课程的其他班、之前已选的课程以及上层已排除的候选都不再处理。
-        if (selected_[i] || !active_[i][v]) { continue; }
-        active_[i][v] = false;
-        --remaining_[i];
-        removed_.push_back({i, v});
-        ++result_.statistics.candidateRemovals;
+    for (size_t i = 0; i < domains_.size(); ++i) {
+        if (selected_[i]) { continue; }
+        for (size_t v = 0; v < domains_[i].size(); ++v) {
+            if (active_[i][v] && chosen->timeBitmap().intersects(domains_[i][v]->timeBitmap())) {
+                active_[i][v] = false;
+                --remaining_[i];
+                removed_.push_back({i, v});
+                ++result_.statistics.candidateRemovals;
+            }
+        }
         if (remaining_[i] == 0) {
             ++result_.statistics.domainWipeouts;
             return false;
@@ -171,21 +170,19 @@ void Searcher::restore(size_t mark) {
     }
 }
 
-// 保存当前选课方案。返回 false 表示方案数已满，需要停止搜索。
+// 评价并尝试保留当前方案。返回值始终为 true：方案数上限由大根堆处理，不中止搜索。
 bool Searcher::saveSchedule() {
     ++result_.statistics.completeLeaves;
-    // 找到第 K+1 个方案才标记截断，这样恰好有 K 个方案时仍能报告“全部搜完”。
-    if (result_.schedules.size() == options_.maxSolutions) {
-        result_.status = SearchStatus::SolutionLimit;
-        return false;
-    }
+    ++result_.totalSolutions;
     Schedule schedule = initial_;
     // 按课程分组顺序排列，不跟随 MRV 的实际选课顺序。
     for (const TeachingClass* teachingClass : selected_) {
         schedule.selectedTeachingClassIds.push_back(teachingClass->id());
     }
     schedule.occupiedTimeBitmap = occupied_;
-    result_.schedules.push_back(schedule);
+    schedule.evaluation = ScheduleEvaluator::evaluate(project_, schedule);
+    // 堆装满后新的方案优于堆顶（当前最差的一个）才会替换，方案数上限不再意味着停止搜索。
+    heap_.offer(move(schedule));
     return true;
 }
 
@@ -245,6 +242,13 @@ SearchResult Searcher::run() {
             remaining_.push_back(domain.size());
         }
         dfs(0);
+    }
+    // 堆中的方案没有内部顺序，取出时按偏好优先级从优到差排列。
+    result_.schedules = heap_.drainSorted();
+    // 搜索被节点上限或取消打断时，保留的只是已探索部分中较优的方案；
+    // 搜索完整跑完而方案数超过上限时，保留的就是全局最优的前 K 个。
+    if (result_.status == SearchStatus::Complete && result_.totalSolutions > options_.maxSolutions) {
+        result_.status = SearchStatus::SolutionLimit;
     }
     auto end = chrono::steady_clock::now();
     result_.statistics.elapsedMilliseconds = chrono::duration<double, milli>(end - start).count();

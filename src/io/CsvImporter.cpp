@@ -149,8 +149,14 @@ ImportSummary CsvImporter::importText(const QString& csv, TeachingClassService& 
         const auto get = [&](const char* key) { return row.fields[columns.value(QString::fromUtf8(key))].trimmed(); };
         try {
             bool ok = false;
-            const double credits = get("学分").toDouble(&ok);
-            if (!ok) { throw invalid_argument("学分格式无效"); }
+            const auto creditText = get("学分");
+            // 课表转换器输出草稿时课程代码和学分留空，等待人工补齐；空学分按 0 处理，
+            // 不阻塞导入，其余非法写法仍然报错。
+            double credits = 0.0;
+            if (!creditText.isEmpty()) {
+                credits = creditText.toDouble(&ok);
+                if (!ok) { throw invalid_argument("学分格式无效"); }
+            }
             const auto fixedText = get("是否为固定课程");
             if (fixedText != QStringLiteral("是") && fixedText != QStringLiteral("否")) {
                 throw invalid_argument("是否为固定课程只能填写 是 或 否");
@@ -177,7 +183,12 @@ ImportSummary CsvImporter::importText(const QString& csv, TeachingClassService& 
                     roomParts[part].trimmed().toStdString());
                 appendUniqueMeetings(rowMeetings, incoming, summary.skippedDuplicates);
             }
-            TeachingClass teachingClass(get("课程代码").toStdString(), get("课程名称").toStdString(), credits, get("授课教师").toStdString(), move(rowMeetings), target.semesterWeeks(), isFixed);
+            // 转换器草稿的课程代码留空；先借用课程名称占位，保证教学班 ID 可生成，
+            // 人工在界面补齐正式代码时会同步更新 ID 和相关约束引用。
+            const auto nameText = get("课程名称");
+            const auto codeText = get("课程代码");
+            TeachingClass teachingClass((codeText.isEmpty() ? nameText : codeText).toStdString(), nameText.toStdString(),
+                credits, get("授课教师").toStdString(), move(rowMeetings), target.semesterWeeks(), isFixed);
             const auto existingTeachingClass = teachingClassIndex.find(teachingClass.id());
             if (existingTeachingClass == teachingClassIndex.end()) {
                 summary.addedMeetings += teachingClass.meetings().size();

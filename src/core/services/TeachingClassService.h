@@ -27,7 +27,7 @@ public:
     void setConstraints(UserConstraints constraints);
     void replaceTeachingClasses(vector<TeachingClass> teachingClasses);
 private:
-    void commitData(vector<TeachingClass> teachingClasses, UserConstraints constraints, ConflictGraph graph);
+    void commitData(vector<TeachingClass> teachingClasses, UserConstraints constraints);
     void reconcile(const vector<TeachingClass>& teachingClasses, UserConstraints& constraints) const;
     int semesterWeeks_;
     vector<TeachingClass> teachingClasses_;

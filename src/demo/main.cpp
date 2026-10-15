@@ -40,7 +40,7 @@ int main() {
     const TeachingClass dbWang("CS102", "数据库", 3.0, "王老师", {Meeting(parseWeeks("[5-7周]"), 1, 1, 1, "H301")});
     const TeachingClass peChen("PE101", "体育", 1.0, "陈老师", {Meeting(parseWeeks("1-20周", 20, WeekPattern::EvenWeek), 7, 6, 6, "体育馆")});
 
-    cout << "个人选课系统 v0.8 — 核心模型与冲突检测演示\n"
+    cout << "个人选课系统 v0.9 — 核心模型与冲突检测演示\n"
               << "默认学期：20周；每天6个固定时段；支持一周多次上课。\n\n";
     show(osZhang, dbWang);
     show(osZhang, osLi);

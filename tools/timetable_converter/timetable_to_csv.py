@@ -13,13 +13,26 @@ HEADERS = ["课程代码", "课程名称", "授课教师", "周次", "上课时�
 DAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 PERIODS = {f"{2 * period - 1}-{2 * period}": period for period in range(1, 7)}
 PUNCTUATION = str.maketrans({"，": ",", "［": "[", "］": "]", "－": "-", "–": "-", "—": "-"})
-TEACHER_WEEKS = re.compile(r"([^,\[\]\n]+?)\s*\[([^\]]+)\]\s*周")
+# 教师与周次：周次写在方括号内，末尾的“周”可有可无（[1-5,7-9周]、[1-5,7-9] 都要识别）。
+TEACHER_WEEKS = re.compile(r"([^\n\[\]]+?)\s*\[([^\]\n]+?)\]\s*周?")
 ROOM = re.compile(r"([A-Za-z\u4e00-\u9fff]+)-?(\d+[A-Za-z]?)")
+# 学校不同版本导出用不同方式分隔同一课格里的多条记录：
+# 换行、◇/◆ 附注符号，或 <br>/</br>/&lt;br&gt; 之类的标签。
+# 全部换成换行，使每条记录各占一行；注意要先把 <br> 变成换行，
+# 再删除其余标签，否则“N楼-218计算机网络”会被拼成一条记录。
+RECORD_SEPARATORS = re.compile(r"[\r\n]+|◇|◆|<br\s*/?>|</br\s*>|&lt;br\s*/?&gt;|&lt;/br\s*&gt;", re.IGNORECASE)
 
 def clean(text):
-    return re.sub(r"<[^>]*>", "", str(text)).replace("\r\n", "\n").replace("\r", "\n").strip()
+    # 先把全角标点归一成半角，再做分隔符替换：学校导出常把周次写成［1-5，7-9周］，
+    # 若等到 parse_cell 才转换，TEACHER_WEEKS 就匹配不到全角方括号。
+    text = RECORD_SEPARATORS.sub("\n", str(text)).translate(PUNCTUATION)
+    return re.sub(r"<[^>]*>", "", text).strip()
 
 def parse_weeks(expression):
+    # 周次可能带结尾的“周”，例如 [1-5,7-9周]；这里统一去掉再解析。
+    expression = expression.strip()
+    if expression.endswith("周"):
+        expression = expression[:-1]
     weeks = set()
     for part in expression.translate(PUNCTUATION).split(","):
         match = re.fullmatch(r"\s*(\d+)\s*(?:-\s*(\d+))?\s*", part)

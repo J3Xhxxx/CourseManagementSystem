@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(CoursePlanner VERSION 0.8.0 LANGUAGES CXX)
+project(CoursePlanner VERSION 0.9.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,8 +15,10 @@ add_library(course_core
     src/core/structures/TimeBitSet.cpp
     src/core/model/Meeting.cpp
     src/core/model/TeachingClass.cpp
+    src/core/model/Schedule.cpp
     src/core/model/UserConstraints.cpp
     src/core/algorithms/ConflictDetector.cpp
+    src/core/algorithms/ScheduleEvaluator.cpp
     src/core/algorithms/ScheduleGenerator.cpp
     src/core/algorithms/ScheduleValidator.cpp
     src/core/algorithms/BruteForceGenerator.cpp
@@ -38,7 +40,6 @@ if(COURSE_PLANNER_WITH_QT)
     add_executable(course_data src/demo/data_main.cpp)
     target_link_libraries(course_data PRIVATE course_io)
     add_library(course_ui
-        src/ui/LoginDialog.cpp src/ui/LoginDialog.h
         src/ui/ProjectController.cpp src/ui/ProjectController.h
         src/ui/MainWindow.cpp src/ui/MainWindow.h
         src/ui/TeachingClassPanel.cpp src/ui/TeachingClassPanel.h

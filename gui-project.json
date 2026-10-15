@@ -1,0 +1,1150 @@
+{
+    "constraints": {
+        "forbiddenTimes": [
+            {
+                "period": 1,
+                "week": 1,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 1,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 1,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 1,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 1,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 1,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 1,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 2,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 2,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 2,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 2,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 2,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 2,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 2,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 3,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 3,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 3,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 3,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 3,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 3,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 3,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 4,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 4,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 4,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 4,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 4,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 4,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 4,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 5,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 5,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 5,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 5,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 5,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 5,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 5,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 6,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 6,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 6,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 6,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 6,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 6,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 6,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 7,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 7,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 7,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 7,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 7,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 7,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 7,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 8,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 8,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 8,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 8,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 8,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 8,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 8,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 9,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 9,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 9,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 9,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 9,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 9,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 9,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 10,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 10,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 10,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 10,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 10,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 10,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 10,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 11,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 11,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 11,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 11,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 11,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 11,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 11,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 12,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 12,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 12,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 12,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 12,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 12,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 12,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 13,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 13,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 13,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 13,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 13,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 13,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 13,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 14,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 14,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 14,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 14,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 14,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 14,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 14,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 15,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 15,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 15,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 15,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 15,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 15,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 15,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 16,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 16,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 16,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 16,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 16,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 16,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 16,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 17,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 17,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 17,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 17,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 17,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 17,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 17,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 18,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 18,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 18,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 18,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 18,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 18,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 18,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 19,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 19,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 19,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 19,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 19,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 19,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 19,
+                "weekday": 6
+            },
+            {
+                "period": 1,
+                "week": 20,
+                "weekday": 1
+            },
+            {
+                "period": 1,
+                "week": 20,
+                "weekday": 6
+            },
+            {
+                "period": 2,
+                "week": 20,
+                "weekday": 6
+            },
+            {
+                "period": 3,
+                "week": 20,
+                "weekday": 6
+            },
+            {
+                "period": 4,
+                "week": 20,
+                "weekday": 6
+            },
+            {
+                "period": 5,
+                "week": 20,
+                "weekday": 6
+            },
+            {
+                "period": 6,
+                "week": 20,
+                "weekday": 6
+            }
+        ],
+        "lockedTeachingClassIds": [
+            "11:22WHPE1300525:体育（5）【排球】9:门晓燕"
+        ],
+        "preferences": [
+            "上课天数",
+            "空堂节数",
+            "早课次数",
+            "最大连续节数",
+            "最晚结束节次",
+            "空闲半天数"
+        ],
+        "requiredCourseKeys": [
+            "11:22WHCS2201212:操作系统",
+            "11:22WHCS2202015:计算机网络",
+            "11:22WHCS2202215:数据库系统",
+            "11:22WHCS3110121:计算机体系结构",
+            "11:22WHMX1100822:形势与政策（3）",
+            "11:22WHPE1300525:体育（5）【排球】",
+            "12:22WHMT22214F29:分子生物学基础(汉语)",
+            "12:22WHMT22217F23:细胞生物学(汉语)",
+            "12:22WHPH33004F20:量子力学(汉语)"
+        ]
+    },
+    "semesterWeeks": 20,
+    "teachingClasses": [
+        {
+            "code": "22WHCS22020",
+            "credits": 3.5,
+            "isFixed": true,
+            "meetings": [
+                {
+                    "classroom": "N331",
+                    "endPeriod": 1,
+                    "startPeriod": 1,
+                    "weekday": 2,
+                    "weeks": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        7,
+                        8,
+                        9
+                    ]
+                },
+                {
+                    "classroom": "N331",
+                    "endPeriod": 1,
+                    "startPeriod": 1,
+                    "weekday": 4,
+                    "weeks": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        7,
+                        8,
+                        9
+                    ]
+                },
+                {
+                    "classroom": "N331",
+                    "endPeriod": 1,
+                    "startPeriod": 1,
+                    "weekday": 5,
+                    "weeks": [
+                        1,
+                        2,
+                        3,
+                        4
+                    ]
+                }
+            ],
+            "name": "计算机网络",
+            "teacher": "刘老师"
+        },
+        {
+            "code": "22WHMX11008",
+            "credits": 0.5,
+            "isFixed": true,
+            "meetings": [
+                {
+                    "classroom": "N223",
+                    "endPeriod": 1,
+                    "startPeriod": 1,
+                    "weekday": 5,
+                    "weeks": [
+                        14,
+                        15,
+                        16,
+                        17
+                    ]
+                }
+            ],
+            "name": "形势与政策（3）",
+            "teacher": "吴老师"
+        },
+        {
+            "code": "22WHCS22012",
+            "credits": 3.5,
+            "isFixed": true,
+            "meetings": [
+                {
+                    "classroom": "N329",
+                    "endPeriod": 2,
+                    "startPeriod": 2,
+                    "weekday": 1,
+                    "weeks": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        7,
+                        8,
+                        9
+                    ]
+                },
+                {
+                    "classroom": "N329",
+                    "endPeriod": 2,
+                    "startPeriod": 2,
+                    "weekday": 3,
+                    "weeks": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        7,
+                        8,
+                        9
+                    ]
+                },
+                {
+                    "classroom": "N329",
+                    "endPeriod": 2,
+                    "startPeriod": 2,
+                    "weekday": 5,
+                    "weeks": [
+                        1,
+                        2,
+                        3,
+                        4
+                    ]
+                }
+            ],
+            "name": "操作系统",
+            "teacher": "周老师"
+        },
+        {
+            "code": "22WHCS31101",
+            "credits": 4,
+            "isFixed": true,
+            "meetings": [
+                {
+                    "classroom": "N333",
+                    "endPeriod": 2,
+                    "startPeriod": 2,
+                    "weekday": 1,
+                    "weeks": [
+                        10,
+                        11,
+                        12,
+                        13,
+                        14,
+                        15,
+                        16,
+                        17
+                    ]
+                },
+                {
+                    "classroom": "N333",
+                    "endPeriod": 2,
+                    "startPeriod": 2,
+                    "weekday": 3,
+                    "weeks": [
+                        10,
+                        11,
+                        12,
+                        13,
+                        14,
+                        15,
+                        16,
+                        17
+                    ]
+                },
+                {
+                    "classroom": "N333",
+                    "endPeriod": 2,
+                    "startPeriod": 2,
+                    "weekday": 5,
+                    "weeks": [
+                        14,
+                        15,
+                        16,
+                        17
+                    ]
+                }
+            ],
+            "name": "计算机体系结构",
+            "teacher": "季老师、李老师"
+        },
+        {
+            "code": "22WHCS22022",
+            "credits": 3,
+            "isFixed": true,
+            "meetings": [
+                {
+                    "classroom": "N331",
+                    "endPeriod": 2,
+                    "startPeriod": 2,
+                    "weekday": 2,
+                    "weeks": [
+                        10,
+                        11,
+                        12,
+                        13,
+                        14,
+                        15,
+                        16,
+                        17
+                    ]
+                },
+                {
+                    "classroom": "N331",
+                    "endPeriod": 2,
+                    "startPeriod": 2,
+                    "weekday": 4,
+                    "weeks": [
+                        10,
+                        11,
+                        12,
+                        13,
+                        14,
+                        15,
+                        16,
+                        17
+                    ]
+                },
+                {
+                    "classroom": "N331",
+                    "endPeriod": 3,
+                    "startPeriod": 3,
+                    "weekday": 5,
+                    "weeks": [
+                        10,
+                        11,
+                        12,
+                        13
+                    ]
+                }
+            ],
+            "name": "数据库系统",
+            "teacher": "张老师"
+        },
+        {
+            "code": "22WHMT22214F",
+            "credits": 2,
+            "isFixed": false,
+            "meetings": [
+                {
+                    "classroom": "G101",
+                    "endPeriod": 5,
+                    "startPeriod": 5,
+                    "weekday": 2,
+                    "weeks": [
+                        10,
+                        11,
+                        12,
+                        13,
+                        14,
+                        15,
+                        16,
+                        17
+                    ]
+                },
+                {
+                    "classroom": "G101",
+                    "endPeriod": 5,
+                    "startPeriod": 5,
+                    "weekday": 4,
+                    "weeks": [
+                        10,
+                        11,
+                        12,
+                        13,
+                        14,
+                        15,
+                        16,
+                        17
+                    ]
+                }
+            ],
+            "name": "分子生物学基础(汉语)",
+            "teacher": "王晓飞"
+        },
+        {
+            "code": "22WHMT22217F",
+            "credits": 2,
+            "isFixed": false,
+            "meetings": [
+                {
+                    "classroom": "N112",
+                    "endPeriod": 1,
+                    "startPeriod": 1,
+                    "weekday": 6,
+                    "weeks": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        7,
+                        8,
+                        9
+                    ]
+                },
+                {
+                    "classroom": "N112",
+                    "endPeriod": 2,
+                    "startPeriod": 2,
+                    "weekday": 6,
+                    "weeks": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        7,
+                        8,
+                        9
+                    ]
+                }
+            ],
+            "name": "细胞生物学(汉语)",
+            "teacher": "侯艳华"
+        },
+        {
+            "code": "22WHPH33004F",
+            "credits": 3,
+            "isFixed": false,
+            "meetings": [
+                {
+                    "classroom": "H441",
+                    "endPeriod": 5,
+                    "startPeriod": 5,
+                    "weekday": 1,
+                    "weeks": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        7,
+                        8,
+                        9,
+                        10,
+                        11,
+                        12,
+                        13
+                    ]
+                },
+                {
+                    "classroom": "H441",
+                    "endPeriod": 5,
+                    "startPeriod": 5,
+                    "weekday": 3,
+                    "weeks": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        7,
+                        8,
+                        9,
+                        10,
+                        11,
+                        12,
+                        13
+                    ]
+                }
+            ],
+            "name": "量子力学(汉语)",
+            "teacher": "董全力"
+        },
+        {
+            "code": "22WHPE13005",
+            "credits": 0.5,
+            "isFixed": false,
+            "meetings": [
+                {
+                    "classroom": "排球场",
+                    "endPeriod": 3,
+                    "startPeriod": 3,
+                    "weekday": 1,
+                    "weeks": [
+                        1,
+                        2,
+                        3,
+                        4,
+                        5,
+                        7,
+                        8,
+                        9
+                    ]
+                }
+            ],
+            "name": "体育（5）【排球】",
+            "teacher": "门晓燕"
+        },
+        {
+            "code": "22WHIE43112",
+            "credits": 1,
+            "isFixed": false,
+            "meetings": [
+                {
+                    "classroom": "H427",
+                    "endPeriod": 5,
+                    "startPeriod": 5,
+                    "weekday": 3,
+                    "weeks": [
+                        2,
+                        3
+                    ]
+                },
+                {
+                    "classroom": "H427",
+                    "endPeriod": 6,
+                    "startPeriod": 6,
+                    "weekday": 3,
+                    "weeks": [
+                        2,
+                        3
+                    ]
+                }
+            ],
+            "name": "群体智能与进化算法--编程与实践",
+            "teacher": "邓立宝"
+        }
+    ],
+    "version": 5
+}

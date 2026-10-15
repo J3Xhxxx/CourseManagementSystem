@@ -1,6 +1,6 @@
 # 核心算法代码解释
 
-本文解释排课搜索相关的 7 个文件：
+本文解释排课搜索相关的 9 个文件：
 
 | 文件 | 作用 |
 | --- | --- |
@@ -8,6 +8,10 @@
 | `src/core/algorithms/ConflictDetector.cpp` | 判断两个教学班能否同时选，并给出原因 |
 | `src/core/structures/ConflictGraph.cpp` | 把所有教学班两两之间的冲突建成一张无向图，供界面查看 |
 | `src/core/algorithms/ScheduleGenerator.h/.cpp` | 选课方案搜索：回溯、MRV、MRV + 前向检查三种策略 |
+| `src/core/algorithms/ScheduleEvaluator.h/.cpp` | 六项方案评价指标、偏好优先级校验、字典序比较与排序 |
+| `src/core/structures/BoundedMaxHeap.h` | 固定容量二叉堆，只保留按偏好排序较优的前 K 个方案 |
+| `src/core/algorithms/ScheduleValidator.cpp` | 独立校验方案合法性，并用评价器复核方案保存的指标 |
+| `src/core/algorithms/BruteForceGenerator.cpp` | 小规模完整枚举基线，先评价再校验 |
 | `src/demo/benchmark_main.cpp` | 用 4 组固定数据比较暴力枚举和三种策略的正确性与效率 |
 
 它们的依赖关系是：
@@ -18,8 +22,10 @@ TimeBitSet  ←  TeachingClass（每个教学班缓存一份自己的时间位�
 ConflictDetector  ←  ConflictGraph  ←  TeachingClassService（项目数据）
     ↑                                         ↑
     └──────────── ScheduleGenerator ──────────┘
-                         ↑
-                  benchmark_main（与 BruteForceGenerator 对照）
+                     ↑            ↑
+        BruteForceGenerator   ScheduleEvaluator（指标 + 偏好比较器）
+                     ↑            ↑
+              ScheduleValidator   BoundedMaxHeap（Top-K 保留）
 ```
 
 ---
@@ -169,11 +175,11 @@ for (size_t i = 0; i < n; ++i)
 2. 再对所有 `i < j` 的教学班对调用一次 `analyze`，共 n(n-1)/2 次。`j` 从 `i + 1` 开始，保证每一对只比较一次。
 3. 无向图的一条边在两个端点的邻接表里各存一份，但 `edgeCount_` 只加 1。
 
-整图构建需要两两比较全部教学班。现在单班新增、修改只比较该班与其他 n−1 个班，保留其他班之间的边；删除时只清理关联的双向记录。批量导入和 JSON 读取仍整图构建。
+建图复杂度为 O(n² × B)，B 为位图整数个数。每次增删改教学班后，`TeachingClassService` 会重新建图。
 
 ### 3.3 和搜索的关系
 
-冲突图同时用于界面展示和搜索中的前向检查。前向检查沿所选班的邻接表排除冲突候选；DFS 判断候选与“已选所有班的时间并集”是否冲突时，仍使用位图求交。
+冲突图主要给界面“教学班冲突”页使用，显示某个班与哪些班互斥、为什么互斥。搜索算法 `ScheduleGenerator` 不查冲突图，而是直接用位图判断冲突，原因是搜索中要判断的是“候选班”与“**已选所有班的时间并集**”是否冲突，一次位图求交就够了，比逐条查边快。
 
 ---
 
@@ -204,14 +210,16 @@ for (size_t i = 0; i < n; ++i)
 
 | 值 | 含义 |
 | --- | --- |
-| `Complete` | 整棵搜索树都搜完了，结果是全部合法方案 |
-| `SolutionLimit` | 方案数达到上限，后面还有方案没保存 |
-| `NodeLimit` | 尝试次数达到上限，搜索没完成 |
-| `Cancelled` | 用户取消 |
+| `Complete` | 整棵搜索树都搜完了，合法方案数不超过保留上限，结果是全部合法方案 |
+| `SolutionLimit` | 整棵搜索树都搜完了，但合法方案多于保留上限，只保留按偏好排序较优的前 K 个 |
+| `NodeLimit` | 尝试次数达到上限，搜索没完成，保留的只是已探索部分中较优的方案 |
+| `Cancelled` | 用户取消，搜索没完成 |
 
-只有 `Complete` 时“0 个方案”才能说明真的无解；其他情况下 0 个方案只表示“还没找到”。
+前两种属于“搜索完整跑完”，此时保留的方案就是全局最优的前 K 个；只有 `Complete` 时“0 个方案”才能说明真的无解。后两种即使有方案，也必须在界面上声明“不能视为全局最优”。
 
-### 4.4 SearchStatistics：统计数据
+### 4.4 SearchStatistics 与 SearchResult：统计数据
+
+`SearchStatistics` 字段：
 
 | 字段 | 含义 |
 | --- | --- |
@@ -221,6 +229,16 @@ for (size_t i = 0; i < n; ++i)
 | `candidateRemovals` | 前向检查删除候选的累计次数 |
 | `domainWipeouts` | 前向检查发现某门课已没有候选的次数 |
 | `elapsedMilliseconds` | 用时 |
+
+`SearchResult` 除 `schedules`、`status`、`statistics` 外还有：
+
+| 字段 | 含义 |
+| --- | --- |
+| `totalSolutions` | 搜索过程中遇到的全部完整合法方案数，可能大于 `schedules.size()` |
+| `coursesWithoutCandidates` | 过滤后已无可选班的必选课程 |
+| `constraintConflicts` | 固定班、锁定班与禁止时间之间的直接冲突 |
+| `complete()` | 前两种状态返回 true，表示搜索完整跑完 |
+| `globallyRanked()` | 与 `complete()` 同义：保留的结果可视为全局最优前 K 个 |
 
 ### 4.5 ConstraintConflict：搜索前就能发现的无解原因
 
@@ -254,7 +272,6 @@ SearchResult ScheduleGenerator::generate(const TeachingClassService& project, co
 | `active_[i][v]` | 第 i 门课的第 v 个候选是否还有效（前向检查用） |
 | `remaining_[i]` | 第 i 门课还剩几个有效候选（前向检查用） |
 | `removed_` | 前向检查的删除记录栈，回溯时用来恢复 |
-| `candidatePositions_` | 教学班 ID 到 `(课程下标, 候选下标)` 的散列表，用于从冲突邻居定位候选 |
 
 `run()` 的流程：
 
@@ -340,14 +357,10 @@ MRV 每次都要重新扫描所有未选课程的所有候选，单次选择的�
 
 ### 5.5 forwardCheck()：前向检查
 
-建立候选域时，把本次有效候选的 ID 和位置存入 `candidatePositions_`。每选定一个班 `chosen`，只遍历它在冲突图中的邻居，定位并停用其中尚未选课的有效候选：
+每选定一个班 `chosen`，就去看所有**还没选的课**，把其中与 `chosen` 时间冲突的候选标记为无效：
 
 ```cpp
-for (const auto& edge : project_.graph().neighbors(chosen->id())) {
-    auto position = candidatePositions_.find(edge.neighborId);
-    if (position == candidatePositions_.end()) { continue; }
-    const auto [i, v] = position->second;
-    if (selected_[i] || !active_[i][v]) { continue; }
+if (active_[i][v] && chosen 与 domains_[i][v] 冲突) {
     active_[i][v] = false;
     --remaining_[i];
     removed_.push_back({i, v});      // 记下来，回溯时恢复
@@ -357,8 +370,6 @@ for (const auto& edge : project_.graph().neighbors(chosen->id())) {
 如果某门课的候选被删光（`remaining_[i] == 0`），说明“选了 chosen 之后这门课无班可选”，不用等搜到那门课才发现，现在就可以剪枝（剪枝 2），并记一次 `domainWipeouts`。
 
 和普通回溯相比，前向检查把“将来一定会发生的冲突”提前到现在发现，搜索树会小很多。
-
-邻接表避免了逐个扫描无关候选和重复计算位图交集。图中可能还有未勾选课程、被固定课表或禁止时间过滤掉的班，因此查不到候选位置时直接跳过。同课程互斥邻居也会跳过，因为 `chosen` 所在课程已被选定。
 
 ### 5.6 removed_ 与 restore()：可撤销的删除
 
@@ -378,21 +389,22 @@ void Searcher::restore(size_t mark) {
 
 这样只会恢复**本层**删除的候选，上层删除的候选在 `mark` 之前，不会被误恢复。这和“撤销操作”的栈是同一个思路。
 
-### 5.7 saveSchedule()：保存方案与上限处理
+### 5.7 saveSchedule()：评价与 Top-K 保留
 
 ```cpp
 ++completeLeaves;
-if (schedules.size() == maxSolutions) {
-    status = SolutionLimit;
-    return false;
-}
-保存方案
-return true;
+++totalSolutions;
+构造完整方案（固定班 + 按分组顺序选中的班）
+schedule.evaluation = ScheduleEvaluator::evaluate(project_, schedule);  // 只评价合法方案
+heap_.offer(schedule);   // 堆装满后，更优的方案替换掉堆顶（当前最差的一个）
+return true;             // 方案数上限不再中止搜索
 ```
 
-注意判断上限是在**保存之前**：已经存满 K 个，又找到第 K+1 个时，才标记 `SolutionLimit` 并停止。如果恰好只有 K 个方案，搜索会正常搜完并报告 `Complete`，用户就能知道“方案就这么多”，而不是误以为还有更多。也正因为如此，`completeLeaves` 可能比保存的方案数多 1。
+和上一阶段的区别：
 
-方案里的教学班顺序：先是固定课程（来自 `initial_`），再按课程顺序排列 `selected_`，与 MRV 实际的选择顺序无关，方便界面展示。
+- 方案不再直接追加进 `vector`，而是先计算六项评价指标，再交给固定容量大根堆；
+- 达到 K 个方案**不再停止搜索**，因此搜索跑完时保留的是全局最优的前 K 个，`SolutionLimit` 表示“合法方案多于 K，只保留了较优的 K 个”；
+- 最后的 `result_.schedules = heap_.drainSorted()` 把堆内的方案按偏好从优到差取出。
 
 ### 5.8 一个小例子
 
@@ -450,9 +462,11 @@ A=2 → B=1 → C=1 冲突剪枝；B=2 冲突剪枝 → 回溯
 
 1. 计算暴力枚举的组合总数（各课程班数的乘积），运行暴力枚举并计时。
 2. 依次用三种策略运行 `ScheduleGenerator::generate`。上限设得很大（10 万个方案、100 万次尝试），保证能搜完。
-3. 每种策略输出一行 CSV：方案数、尝试次数、完整组合数、剪枝次数、用时、是否与暴力枚举一致。
+3. 每种策略输出一行 CSV：合法方案总数、保留方案数、尝试次数、完整组合数、剪枝次数、用时、是否与暴力枚举一致。方案数比较使用 `totalSolutions`，不受 Top-K 保留上限影响。
 
 ### 6.4 实际结果（Release，本机）
+
+下表是 2026-10-01 的性能对照，列格式为当时的版本；现在多了 `kept`（保留方案数）一列，其余含义不变。重新运行即可得到新格式。
 
 ```
 case,strategy,solutions,visited_nodes,complete_combinations,pruned_branches,elapsed_ms,same_as_brute
@@ -490,3 +504,108 @@ dense_unsatisfiable,MRV+FC,0,64,0,24,0.014,yes
 ./scripts/build.ps1 -Configuration Release
 <构建目录>/course_benchmark.exe
 ```
+
+---
+
+## 7. ScheduleEvaluator：方案评价与偏好排序
+
+### 7.1 为什么要按真实周次评价
+
+一个方案的 `occupiedTimeBitmap` 把整个学期编码成 W×7×6 个时间位。如果直接把所有周叠加成一张“平均课表”，就会把“第 3 周周一有课”和“第 5 周周一有课”当成同一天，早课次数、上课天数、空堂都会算错。`evaluate()` 因此按 `week` 外层循环、`weekday` 中层、`period` 内层逐格检查：
+
+```
+for week in 1..W:
+    for day in 1..7:
+        读出这一周这一天 6 个大节的占用情况
+        全部为空 -> 空闲半天 +2，跳过
+        否则     -> 上课天数 +1
+                    第一大节有课 -> 早课次数 +1
+                    空堂 += (最后一节 - 第一节 + 1 - 有课节数)
+                    最大连续节数 = max(当前连续长度)
+                    最晚结束节次 = max(该日最后一节)
+                    上午/下午各自全空 -> 空闲半天 +1
+```
+
+复杂度 O(W×7×6)，与方案里选了多少教学班无关；只用方案自己的位图，不重新展开 Meeting，所以统计口径与搜索时选中的班完全一致。
+
+### 7.2 六项指标
+
+| 指标 | 定义 | 方向 |
+| --- | --- | --- |
+| 早课次数 | 第一大节有课的“周次×星期”数量 | 越小越好 |
+| 上课天数 | 有课的“周次×星期”去重数量 | 越小越好 |
+| 空堂节数 | 当天第一节课到最后一节课之间的空缺节数之和 | 越小越好 |
+| 最大连续节数 | 单日连续有课的最长节数 | 越小越好 |
+| 最晚结束节次 | 全学期最晚结束的节次，无课为 0 | 越小越好 |
+| 空闲半天数 | 整学期完全没课的半天数，上限 W×7×2 | 越大越好 |
+
+指标方向由指标本身固定（`ascendingMetric`），用户只调整优先级顺序，不能反转某一项的方向。
+
+### 7.3 PreferenceOrder 与字典序比较
+
+`PreferenceOrder` 保存六项指标的一个排列，`complete()` 补全缺失项、`validate()` 要求恰好六项且不重复（读取 JSON、界面写回都会校验）。
+
+`ScheduleRanking::better(a, b)` 按优先级依次比较：
+
+```cpp
+for (id : preferences) {
+    left = metricValue(a.evaluation, id);
+    right = metricValue(b.evaluation, id);
+    if (left == right) continue;
+    return ascendingMetric(id) ? left < right : left > right;
+}
+return a.selectedTeachingClassIds < b.selectedTeachingClassIds;  // 兜底，保证全序且可重复
+```
+
+兜底比较让排序成为**全序**：即使两个方案的六项指标完全相同，顺序也是确定的，同一份数据每次运行结果一致。`sortByPreference` 直接使用这个全序（而不是 `stable_sort`），因此它与 Top-K 堆给出的顺序完全相同——这也是临时检查程序里“保留的 5 个与暴力枚举全局前 5 逐个一致”能通过的前提。
+
+---
+
+## 8. BoundedMaxHeap：只保留前 K 个方案
+
+### 8.1 为什么需要它
+
+课程和教学班一多，合法方案可能成千上万。全部存进 `vector` 既费内存，排序也要 O(n log n) 比较。任务书要求用**二叉堆**只保留按偏好较优的前 K 个。
+
+### 8.2 比较器方向：堆顶放最差的
+
+`BoundedMaxHeap<T, HeapAbove>` 的比较器是 `heapAbove(a, b)`，表示 a 在堆中排在 b 上面，也就是 **a 比 b 更差**。这样堆顶恒为“当前保留元素中最差的一个”，于是：
+
+```cpp
+bool offer(T value) {
+    if (size < capacity) { push_back; bubbleUp; return true; }   // 未满，直接插入
+    if (!better_(value, front())) return false;                  // 不比最差的更好，丢弃
+    front() = move(value); sinkDown(0); return true;             // 替换堆顶并下沉
+}
+```
+
+`better_(a, b)` 就是 `heapAbove(b, a)` 取反。对方案来说，`ScheduleAbove::operator()(a, b)` 返回 `ScheduleRanking::worse(a, b)`，即“更差的方案在堆顶”。
+
+只需要 O(K) 内存，每个候选方案最多做一次比较＋一次下沉，均摊 O(log K)。
+
+### 8.3 堆的两个基本操作
+
+下标从 0 开始，父结点 `(i-1)/2`，左孩子 `2i+1`，右孩子 `2i+2`：
+
+- `bubbleUp`：新元素比父结点更“靠上”（更差）就交换，直到满足堆性质；
+- `sinkDown`：每层先选出更“靠上”的孩子，只有它比当前元素更靠上才交换（**必须用孩子与当前元素比较，而不是只看左右孩子谁更差**，否则堆性质会被破坏）。
+
+`drainSorted()` 反复弹出堆顶（当前最差）并下沉，得到的序列是从差到优的，因此反向填充到结果数组，得到从优到差的前 K 个方案。
+
+### 8.4 与搜索语义的关系
+
+| 情况 | `status` | 结果含义 |
+| --- | --- | --- |
+| 搜索跑完，方案数 ≤ K | `Complete` | 全部合法方案，已按偏好排序 |
+| 搜索跑完，方案数 > K | `SolutionLimit` | 全局最优的前 K 个 |
+| 达到尝试上限 | `NodeLimit` | 已探索部分中较优的若干方案，不能称为全局最优 |
+| 用户取消 | `Cancelled` | 同上 |
+
+`totalSolutions` 记录遇到的完整合法方案数，界面用它显示“共 N 个合法方案，保留较优的前 K 个”。
+
+### 8.5 独立复核指标
+
+`ScheduleValidator::validate` 在原有合法性检查之外，还会复制方案、清零指标、调用 `ScheduleEvaluator` 重算一遍，与方案保存的指标逐项比较，不一致就记为 `ValidationCode::MetricsMismatch`。因此：
+
+- 任何构造方案的地方都要“先评价、再校验”（`BruteForceGenerator` 已如此），否则会被判为指标过期；
+- 界面上展示的指标与独立算法算出的指标互为对照，能发现评价代码写错的情况。

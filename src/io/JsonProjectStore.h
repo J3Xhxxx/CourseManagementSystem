@@ -8,7 +8,7 @@ namespace planner {
 
 class JsonProjectStore {
 public:
-    static constexpr int formatVersion = 4;
+    static constexpr int formatVersion = 5;
     static QByteArray serialize(const TeachingClassService& project);
     static TeachingClassService deserialize(const QByteArray& json);
     static void save(const QString& path, const TeachingClassService& project);
