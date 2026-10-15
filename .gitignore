@@ -1,0 +1,7 @@
+/build*/
+/.tools/
+/.idea/
+/.vs/
+/tmp/
+*.user
+__pycache__/
