@@ -9,6 +9,7 @@ namespace planner {
 UserConstraints::UserConstraints(int semesterWeeks) : forbiddenTimes(semesterWeeks) {}
 
 void UserConstraints::validate(const TeachingClassService& project) const {
+    preferenceOrder.validate();
     for (const auto& courseKey : requiredCourseKeys) {
         if (!project.hasCourseKey(courseKey)) {
             throw invalid_argument("必选课程不存在");
@@ -39,7 +40,8 @@ void UserConstraints::validate(const TeachingClassService& project) const {
 bool UserConstraints::operator==(const UserConstraints& other) const noexcept {
     return requiredCourseKeys == other.requiredCourseKeys
         && lockedTeachingClassIds == other.lockedTeachingClassIds
-        && forbiddenTimes == other.forbiddenTimes;
+        && forbiddenTimes == other.forbiddenTimes
+        && preferenceOrder == other.preferenceOrder;
 }
 
 }

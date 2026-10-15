@@ -71,8 +71,12 @@ QByteArray JsonProjectStore::serialize(const TeachingClassService& project) {
     for (const auto& time : project.constraints().forbiddenTimes.occupiedSlots()) {
         forbiddenTimes.append(QJsonObject{{"week", time.week}, {"weekday", time.weekday}, {"period", time.period}});
     }
+    QJsonArray preferences;
+    for (const auto id : project.constraints().preferenceOrder.values) {
+        preferences.append(QString::fromUtf8(metricLabel(id)));
+    }
     const QJsonObject constraints{{"requiredCourseKeys", requiredCourseKeys}, {"lockedTeachingClassIds", lockedTeachingClassIds},
-        {"forbiddenTimes", forbiddenTimes}};
+        {"forbiddenTimes", forbiddenTimes}, {"preferences", preferences}};
     return QJsonDocument(QJsonObject{{"version", formatVersion}, {"semesterWeeks", project.semesterWeeks()},
         {"teachingClasses", teachingClasses}, {"constraints", constraints}}).toJson(QJsonDocument::Indented);
 }
@@ -124,6 +128,19 @@ TeachingClassService JsonProjectStore::deserialize(const QByteArray& json) {
     };
     readIds("requiredCourseKeys", constraints.requiredCourseKeys);
     readIds("lockedTeachingClassIds", constraints.lockedTeachingClassIds);
+    // 现有 version 4 账号文件未保存偏好时使用默认顺序。
+    if (entry.contains("preferences")) {
+        constraints.preferenceOrder.values.clear();
+        const auto preferences = array(entry["preferences"], "constraints.preferences");
+        for (qsizetype i = 0; i < preferences.size(); ++i) {
+            const auto path = QStringLiteral("constraints.preferences[%1]").arg(i);
+            MetricId id;
+            if (!metricFromLabel(jsonString(preferences[i], path).toStdString(), id)) {
+                invalid(path, "未知的评价指标");
+            }
+            constraints.preferenceOrder.values.push_back(id);
+        }
+    }
     const auto times = array(entry["forbiddenTimes"], "constraints.forbiddenTimes");
     for (qsizetype i = 0; i < times.size(); ++i) {
         const auto path = QStringLiteral("constraints.forbiddenTimes[%1]").arg(i);

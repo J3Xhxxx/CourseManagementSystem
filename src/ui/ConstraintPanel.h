@@ -5,6 +5,7 @@
 class QComboBox;
 class QLabel;
 class QLineEdit;
+class QListWidget;
 class QPushButton;
 class QSpinBox;
 class QTableWidget;
@@ -21,6 +22,9 @@ private:
     void setLocked(const string& courseKey, const string& teachingClassId);
     void editForbidden(bool add);
     void removeSelectedForbidden();
+    void movePreference(int offset);
+    void resetPreference();
+    void updatePreferenceButtons();
     void apply(UserConstraints constraints);
     ProjectController& project_;
     QTableWidget* courses_;
@@ -34,6 +38,10 @@ private:
     QLabel* error_;
     QList<QWidget*> inputs_;
     QPushButton* remove_;
+    QListWidget* preference_;
+    QPushButton* preferenceUp_;
+    QPushButton* preferenceDown_;
+    QPushButton* preferenceReset_;
     vector<vector<TimeSlot>> groups_;
     int semesterWeeks_ = 0;
 };
